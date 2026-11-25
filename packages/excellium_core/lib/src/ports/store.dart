@@ -1,0 +1,88 @@
+import '../model/cell_value.dart';
+import '../model/column.dart';
+import '../model/ids.dart';
+import '../model/row.dart';
+import '../model/sheet.dart';
+
+/// Interfaces de stockage (« ports »).
+///
+/// Le cœur métier et l'application ne connaissent que ces interfaces. Chaque
+/// moteur de stockage (SQLite via Drift aujourd'hui, un serveur demain) en
+/// fournit une implémentation, vérifiée par la suite de tests de contrat du
+/// paquet `excellium_store_contract`.
+///
+/// Les flux `watch…` émettent l'état courant dès l'abonnement, puis à chaque
+/// modification.
+
+/// Les feuilles du classeur, triées par rang.
+abstract interface class SheetRepository {
+  Stream<List<Sheet>> watchSheets();
+
+  Future<List<Sheet>> getSheets();
+
+  /// Crée une feuille en dernière position.
+  Future<Sheet> createSheet({required String name});
+
+  Future<void> renameSheet(SheetId id, String name);
+
+  /// Réordonne les feuilles ; [orderedIds] doit contenir tous les identifiants.
+  Future<void> reorderSheets(List<SheetId> orderedIds);
+
+  /// Supprime la feuille avec ses colonnes, ses lignes et ses cellules.
+  Future<void> deleteSheet(SheetId id);
+}
+
+/// Les colonnes d'une feuille, triées par rang.
+abstract interface class ColumnRepository {
+  Stream<List<ColumnDef>> watchColumns(SheetId sheetId);
+
+  Future<List<ColumnDef>> getColumns(SheetId sheetId);
+
+  /// Ajoute une colonne en dernière position.
+  Future<ColumnDef> addColumn(
+    SheetId sheetId, {
+    String name = '',
+    ColumnType type = ColumnType.text,
+  });
+
+  /// Enregistre le nom, le type, la largeur et les paramètres de [column].
+  /// Le rang se change avec [reorderColumns].
+  Future<void> updateColumn(ColumnDef column);
+
+  /// Réordonne les colonnes ; [orderedIds] doit contenir tous les identifiants
+  /// de la feuille.
+  Future<void> reorderColumns(SheetId sheetId, List<ColumnId> orderedIds);
+
+  /// Supprime la colonne et les cellules qu'elle contient.
+  Future<void> deleteColumn(ColumnId id);
+}
+
+/// Les lignes d'une feuille et leurs cellules, triées par rang.
+abstract interface class RowRepository {
+  Stream<List<SheetRow>> watchRows(SheetId sheetId);
+
+  Future<List<SheetRow>> getRows(SheetId sheetId);
+
+  /// Ajoute une ligne vide en dernière position.
+  Future<SheetRow> addRow(SheetId sheetId);
+
+  /// Écrit une cellule ; `null` la vide.
+  Future<void> setCell(RowId rowId, ColumnId columnId, CellValue? value);
+
+  /// Supprime la ligne et ses cellules.
+  Future<void> deleteRow(RowId id);
+}
+
+/// Point d'entrée d'un moteur de stockage.
+abstract interface class ExcelliumStore {
+  SheetRepository get sheets;
+
+  ColumnRepository get columns;
+
+  RowRepository get rows;
+
+  /// Exécute [action] de façon atomique : tout est enregistré, ou rien.
+  Future<T> transaction<T>(Future<T> Function() action);
+
+  Future<void> close();
+}

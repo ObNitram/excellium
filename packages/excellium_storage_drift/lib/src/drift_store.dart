@@ -1,0 +1,356 @@
+import 'package:drift/drift.dart';
+import 'package:excellium_core/excellium_core.dart';
+
+import 'cell_codec.dart';
+import 'database.dart';
+
+/// Implémentation SQLite (Drift) du stockage d'Excellium.
+final class DriftStore implements ExcelliumStore {
+  /// Ouvre le stockage sur [executor] : un fichier sur l'appareil en
+  /// production, une base en mémoire dans les tests.
+  DriftStore(QueryExecutor executor) : _db = ExcelliumDatabase(executor) {
+    sheets = _Sheets(_db);
+    columns = _Columns(_db);
+    rows = _Rows(_db);
+  }
+
+  final ExcelliumDatabase _db;
+
+  @override
+  late final SheetRepository sheets;
+
+  @override
+  late final ColumnRepository columns;
+
+  @override
+  late final RowRepository rows;
+
+  @override
+  Future<T> transaction<T>(Future<T> Function() action) =>
+      _db.transaction(action);
+
+  @override
+  Future<void> close() => _db.close();
+}
+
+final class _Sheets implements SheetRepository {
+  _Sheets(this._db);
+
+  final ExcelliumDatabase _db;
+
+  SimpleSelectStatement<$SheetRecordsTable, SheetRecord> get _ordered =>
+      _db.select(_db.sheetRecords)
+        ..orderBy([(t) => OrderingTerm.asc(t.position)]);
+
+  static Sheet _toSheet(SheetRecord record) => Sheet(
+    id: SheetId(record.id),
+    name: record.name,
+    position: record.position,
+  );
+
+  @override
+  Stream<List<Sheet>> watchSheets() =>
+      _ordered.watch().map((records) => records.map(_toSheet).toList());
+
+  @override
+  Future<List<Sheet>> getSheets() async =>
+      (await _ordered.get()).map(_toSheet).toList();
+
+  @override
+  Future<Sheet> createSheet({required String name}) {
+    return _db.transaction(() async {
+      final count = await _db.sheetRecords.count().getSingle();
+      final sheet = Sheet(id: SheetId(newId()), name: name, position: count);
+      await _db
+          .into(_db.sheetRecords)
+          .insert(
+            SheetRecordsCompanion.insert(
+              id: sheet.id.value,
+              name: sheet.name,
+              position: sheet.position,
+            ),
+          );
+      return sheet;
+    });
+  }
+
+  @override
+  Future<void> renameSheet(SheetId id, String name) =>
+      (_db.update(_db.sheetRecords)..where((t) => t.id.equals(id.value))).write(
+        SheetRecordsCompanion(name: Value(name)),
+      );
+
+  @override
+  Future<void> reorderSheets(List<SheetId> orderedIds) {
+    return _db.transaction(() async {
+      for (final (index, id) in orderedIds.indexed) {
+        await (_db.update(_db.sheetRecords)
+              ..where((t) => t.id.equals(id.value)))
+            .write(SheetRecordsCompanion(position: Value(index)));
+      }
+    });
+  }
+
+  @override
+  Future<void> deleteSheet(SheetId id) {
+    return _db.transaction(() async {
+      await (_db.delete(
+        _db.sheetRecords,
+      )..where((t) => t.id.equals(id.value))).go();
+      final remaining = await _ordered.get();
+      for (final (index, record) in remaining.indexed) {
+        if (record.position == index) continue;
+        await (_db.update(_db.sheetRecords)
+              ..where((t) => t.id.equals(record.id)))
+            .write(SheetRecordsCompanion(position: Value(index)));
+      }
+    });
+  }
+}
+
+final class _Columns implements ColumnRepository {
+  _Columns(this._db);
+
+  final ExcelliumDatabase _db;
+
+  SimpleSelectStatement<$ColumnRecordsTable, ColumnRecord> _ordered(
+    SheetId sheetId,
+  ) => _db.select(_db.columnRecords)
+    ..where((t) => t.sheetId.equals(sheetId.value))
+    ..orderBy([(t) => OrderingTerm.asc(t.position)]);
+
+  static ColumnDef _toColumn(ColumnRecord record) {
+    final type = decodeColumnType(record.type);
+    final reference = record.reference;
+    return ColumnDef(
+      id: ColumnId(record.id),
+      sheetId: SheetId(record.sheetId),
+      position: record.position,
+      name: record.name,
+      type: type,
+      width: record.width,
+      reference: type == ColumnType.reference
+          ? (reference == null
+                ? const ReferenceConfig()
+                : decodeReferenceConfig(reference))
+          : null,
+    );
+  }
+
+  static String? _encodeReference(ColumnDef column) {
+    if (column.type != ColumnType.reference) return null;
+    return encodeReferenceConfig(column.reference ?? const ReferenceConfig());
+  }
+
+  @override
+  Stream<List<ColumnDef>> watchColumns(SheetId sheetId) =>
+      _ordered(sheetId)
+          .watch()
+          .map((records) => records.map(_toColumn).toList());
+
+  @override
+  Future<List<ColumnDef>> getColumns(SheetId sheetId) async =>
+      (await _ordered(sheetId).get()).map(_toColumn).toList();
+
+  @override
+  Future<ColumnDef> addColumn(
+    SheetId sheetId, {
+    String name = '',
+    ColumnType type = ColumnType.text,
+  }) {
+    return _db.transaction(() async {
+      final count = await _db.columnRecords
+          .count(where: (t) => t.sheetId.equals(sheetId.value))
+          .getSingle();
+      final column = ColumnDef(
+        id: ColumnId(newId()),
+        sheetId: sheetId,
+        position: count,
+        name: name,
+        type: type,
+        reference: type == ColumnType.reference
+            ? const ReferenceConfig()
+            : null,
+      );
+      await _db
+          .into(_db.columnRecords)
+          .insert(
+            ColumnRecordsCompanion.insert(
+              id: column.id.value,
+              sheetId: sheetId.value,
+              name: column.name,
+              type: column.type.name,
+              position: column.position,
+              width: column.width,
+              reference: Value(_encodeReference(column)),
+            ),
+          );
+      return column;
+    });
+  }
+
+  @override
+  Future<void> updateColumn(ColumnDef column) =>
+      (_db.update(
+        _db.columnRecords,
+      )..where((t) => t.id.equals(column.id.value))).write(
+        ColumnRecordsCompanion(
+          name: Value(column.name),
+          type: Value(column.type.name),
+          width: Value(column.width),
+          reference: Value(_encodeReference(column)),
+        ),
+      );
+
+  @override
+  Future<void> reorderColumns(SheetId sheetId, List<ColumnId> orderedIds) {
+    return _db.transaction(() async {
+      for (final (index, id) in orderedIds.indexed) {
+        await (_db.update(_db.columnRecords)..where(
+              (t) => t.id.equals(id.value) & t.sheetId.equals(sheetId.value),
+            ))
+            .write(ColumnRecordsCompanion(position: Value(index)));
+      }
+    });
+  }
+
+  @override
+  Future<void> deleteColumn(ColumnId id) {
+    return _db.transaction(() async {
+      final record = await (_db.select(
+        _db.columnRecords,
+      )..where((t) => t.id.equals(id.value))).getSingleOrNull();
+      if (record == null) return;
+      await (_db.delete(
+        _db.columnRecords,
+      )..where((t) => t.id.equals(id.value))).go();
+      final remaining = await _ordered(SheetId(record.sheetId)).get();
+      for (final (index, other) in remaining.indexed) {
+        if (other.position == index) continue;
+        await (_db.update(_db.columnRecords)
+              ..where((t) => t.id.equals(other.id)))
+            .write(ColumnRecordsCompanion(position: Value(index)));
+      }
+    });
+  }
+}
+
+final class _Rows implements RowRepository {
+  _Rows(this._db);
+
+  final ExcelliumDatabase _db;
+
+  /// Lignes de la feuille avec leurs cellules, une ligne SQL par cellule.
+  JoinedSelectStatement<HasResultSet, dynamic> _joined(SheetId sheetId) =>
+      _db.select(_db.rowRecords).join([
+          leftOuterJoin(
+            _db.cellRecords,
+            _db.cellRecords.rowId.equalsExp(_db.rowRecords.id),
+          ),
+        ])
+        ..where(_db.rowRecords.sheetId.equals(sheetId.value))
+        ..orderBy([OrderingTerm.asc(_db.rowRecords.position)]);
+
+  List<SheetRow> _assemble(List<TypedResult> results) {
+    final order = <String>[];
+    final records = <String, RowRecord>{};
+    final cells = <String, Map<ColumnId, CellValue>>{};
+    for (final result in results) {
+      final row = result.readTable(_db.rowRecords);
+      if (!records.containsKey(row.id)) {
+        order.add(row.id);
+        records[row.id] = row;
+        cells[row.id] = {};
+      }
+      final cell = result.readTableOrNull(_db.cellRecords);
+      if (cell == null) continue;
+      final value = decodeCellValue(cell.value);
+      if (value != null) cells[row.id]![ColumnId(cell.columnId)] = value;
+    }
+    return [
+      for (final id in order)
+        SheetRow(
+          id: RowId(id),
+          sheetId: SheetId(records[id]!.sheetId),
+          position: records[id]!.position,
+          cells: cells[id]!,
+        ),
+    ];
+  }
+
+  @override
+  Stream<List<SheetRow>> watchRows(SheetId sheetId) =>
+      _joined(sheetId).watch().map(_assemble);
+
+  @override
+  Future<List<SheetRow>> getRows(SheetId sheetId) async =>
+      _assemble(await _joined(sheetId).get());
+
+  @override
+  Future<SheetRow> addRow(SheetId sheetId) {
+    return _db.transaction(() async {
+      final count = await _db.rowRecords
+          .count(where: (t) => t.sheetId.equals(sheetId.value))
+          .getSingle();
+      final row = SheetRow(
+        id: RowId(newId()),
+        sheetId: sheetId,
+        position: count,
+      );
+      await _db
+          .into(_db.rowRecords)
+          .insert(
+            RowRecordsCompanion.insert(
+              id: row.id.value,
+              sheetId: sheetId.value,
+              position: row.position,
+            ),
+          );
+      return row;
+    });
+  }
+
+  @override
+  Future<void> setCell(RowId rowId, ColumnId columnId, CellValue? value) async {
+    if (value == null) {
+      await (_db.delete(_db.cellRecords)..where(
+            (t) =>
+                t.rowId.equals(rowId.value) & t.columnId.equals(columnId.value),
+          ))
+          .go();
+      return;
+    }
+    await _db
+        .into(_db.cellRecords)
+        .insertOnConflictUpdate(
+          CellRecordsCompanion.insert(
+            rowId: rowId.value,
+            columnId: columnId.value,
+            value: encodeCellValue(value),
+          ),
+        );
+  }
+
+  @override
+  Future<void> deleteRow(RowId id) {
+    return _db.transaction(() async {
+      final record = await (_db.select(
+        _db.rowRecords,
+      )..where((t) => t.id.equals(id.value))).getSingleOrNull();
+      if (record == null) return;
+      await (_db.delete(
+        _db.rowRecords,
+      )..where((t) => t.id.equals(id.value))).go();
+      final remaining =
+          await (_db.select(_db.rowRecords)
+                ..where((t) => t.sheetId.equals(record.sheetId))
+                ..orderBy([(t) => OrderingTerm.asc(t.position)]))
+              .get();
+      for (final (index, other) in remaining.indexed) {
+        if (other.position == index) continue;
+        await (_db.update(_db.rowRecords)..where((t) => t.id.equals(other.id)))
+            .write(RowRecordsCompanion(position: Value(index)));
+      }
+    });
+  }
+}

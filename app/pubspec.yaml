@@ -1,0 +1,28 @@
+name: excellium_app
+description: Application Flutter d'Excellium (interface et état).
+publish_to: none
+version: 0.1.0+1
+resolution: workspace
+
+environment:
+  sdk: ^3.14.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  drift_flutter: ^0.3.1
+  excellium_core:
+    path: ../packages/excellium_core
+  excellium_storage_drift:
+    path: ../packages/excellium_storage_drift
+  flutter_riverpod: ^3.5.0
+  material_ui: ^1.1.0
+  path_provider: ^2.1.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

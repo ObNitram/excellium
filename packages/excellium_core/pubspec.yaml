@@ -1,0 +1,21 @@
+name: excellium_core
+description: >-
+  Cœur métier d'Excellium en Dart pur : modèle, règles (saisie, tri, filtres),
+  cas d'usage et interfaces de stockage. Ne dépend ni de Flutter ni d'une base.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.14.0
+
+dependencies:
+  collection: ^1.19.1
+  meta: ^1.19.0
+  uuid: ^4.6.0
+
+dev_dependencies:
+  excellium_store_contract:
+    path: ../excellium_store_contract
+  lints: ^6.1.0
+  test: ^1.25.0
