@@ -15,6 +15,9 @@ enum ColumnType {
   multiCategory,
   boolean,
   reference,
+
+  /// Colonne calculée : sa valeur vient d'une formule, pas d'une saisie.
+  formula,
 }
 
 /// Cardinalité d'une colonne de référence, vue depuis la cellule.
@@ -86,6 +89,9 @@ final class ColumnDef {
     this.reference,
     this.style = CellStyle.none,
     this.options = const [],
+    this.formula = '',
+    this.groupCalc = '',
+    this.calcCells = const {},
   });
 
   static const double defaultWidth = 120;
@@ -113,6 +119,20 @@ final class ColumnDef {
   /// l'utilisateur. C'est aussi l'ordre des étapes d'un kanban.
   final List<String> options;
 
+  /// Formule d'une colonne [ColumnType.formula], par exemple
+  /// `Quantité × Prix`. Vide pour les autres types.
+  final String formula;
+
+  /// Contenu de la case de cette colonne sur les lignes de regroupement : un
+  /// texte, ou un calcul qui commence par `=` et que chaque groupe évalue sur
+  /// ses propres lignes.
+  final String groupCalc;
+
+  /// Cases de calcul sous la colonne, en bas de la grille : contenu par
+  /// numéro de ligne (à partir de 0). Même convention que [groupCalc], sur
+  /// toute la table.
+  final Map<int, String> calcCells;
+
   /// Lettre de la colonne d'après son rang (A, B, …, Z, AA, …).
   String get letter => columnLetter(position);
 
@@ -128,6 +148,9 @@ final class ColumnDef {
     bool clearReference = false,
     CellStyle? style,
     List<String>? options,
+    String? formula,
+    String? groupCalc,
+    Map<int, String>? calcCells,
   }) => ColumnDef(
     id: id,
     sheetId: sheetId,
@@ -138,6 +161,9 @@ final class ColumnDef {
     reference: clearReference ? null : (reference ?? this.reference),
     style: style ?? this.style,
     options: options ?? this.options,
+    formula: formula ?? this.formula,
+    groupCalc: groupCalc ?? this.groupCalc,
+    calcCells: calcCells ?? this.calcCells,
   );
 
   @override
@@ -151,6 +177,9 @@ final class ColumnDef {
       other.width == width &&
       other.reference == reference &&
       other.style == style &&
+      other.formula == formula &&
+      other.groupCalc == groupCalc &&
+      const MapEquality<int, String>().equals(other.calcCells, calcCells) &&
       const ListEquality<String>().equals(other.options, options);
 
   @override
@@ -163,6 +192,9 @@ final class ColumnDef {
     width,
     reference,
     style,
+    formula,
+    groupCalc,
+    const MapEquality<int, String>().hash(calcCells),
     const ListEquality<String>().hash(options),
   );
 

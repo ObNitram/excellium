@@ -82,6 +82,7 @@ CellInputResult parseCellInput(ColumnType type, String input) {
           : CellInputOk(BoolValue(value));
 
     case ColumnType.reference:
+    case ColumnType.formula:
       return const CellInputRejected(CellInputError.notTypable);
   }
 }

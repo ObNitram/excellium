@@ -360,6 +360,39 @@ class $ColumnRecordsTable extends ColumnRecords
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _formulaMeta = const VerificationMeta(
+    'formula',
+  );
+  @override
+  late final GeneratedColumn<String> formula = GeneratedColumn<String>(
+    'formula',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _groupCalcMeta = const VerificationMeta(
+    'groupCalc',
+  );
+  @override
+  late final GeneratedColumn<String> groupCalc = GeneratedColumn<String>(
+    'group_calc',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _calcCellsMeta = const VerificationMeta(
+    'calcCells',
+  );
+  @override
+  late final GeneratedColumn<String> calcCells = GeneratedColumn<String>(
+    'calc_cells',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -371,6 +404,9 @@ class $ColumnRecordsTable extends ColumnRecords
     reference,
     style,
     options,
+    formula,
+    groupCalc,
+    calcCells,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -447,6 +483,24 @@ class $ColumnRecordsTable extends ColumnRecords
         options.isAcceptableOrUnknown(data['options']!, _optionsMeta),
       );
     }
+    if (data.containsKey('formula')) {
+      context.handle(
+        _formulaMeta,
+        formula.isAcceptableOrUnknown(data['formula']!, _formulaMeta),
+      );
+    }
+    if (data.containsKey('group_calc')) {
+      context.handle(
+        _groupCalcMeta,
+        groupCalc.isAcceptableOrUnknown(data['group_calc']!, _groupCalcMeta),
+      );
+    }
+    if (data.containsKey('calc_cells')) {
+      context.handle(
+        _calcCellsMeta,
+        calcCells.isAcceptableOrUnknown(data['calc_cells']!, _calcCellsMeta),
+      );
+    }
     return context;
   }
 
@@ -492,6 +546,18 @@ class $ColumnRecordsTable extends ColumnRecords
         DriftSqlType.string,
         data['${effectivePrefix}options'],
       ),
+      formula: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}formula'],
+      ),
+      groupCalc: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}group_calc'],
+      ),
+      calcCells: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}calc_cells'],
+      ),
     );
   }
 
@@ -517,6 +583,15 @@ class ColumnRecord extends DataClass implements Insertable<ColumnRecord> {
 
   /// Catégories définies, en JSON ; `null` s'il n'y en a pas.
   final String? options;
+
+  /// Formule d'une colonne Formule ; `null` s'il n'y en a pas.
+  final String? formula;
+
+  /// Contenu de la case de la colonne sur les lignes de regroupement.
+  final String? groupCalc;
+
+  /// Cases de calcul sous la colonne, en JSON (numéro de ligne → contenu).
+  final String? calcCells;
   const ColumnRecord({
     required this.id,
     required this.sheetId,
@@ -527,6 +602,9 @@ class ColumnRecord extends DataClass implements Insertable<ColumnRecord> {
     this.reference,
     this.style,
     this.options,
+    this.formula,
+    this.groupCalc,
+    this.calcCells,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -545,6 +623,15 @@ class ColumnRecord extends DataClass implements Insertable<ColumnRecord> {
     }
     if (!nullToAbsent || options != null) {
       map['options'] = Variable<String>(options);
+    }
+    if (!nullToAbsent || formula != null) {
+      map['formula'] = Variable<String>(formula);
+    }
+    if (!nullToAbsent || groupCalc != null) {
+      map['group_calc'] = Variable<String>(groupCalc);
+    }
+    if (!nullToAbsent || calcCells != null) {
+      map['calc_cells'] = Variable<String>(calcCells);
     }
     return map;
   }
@@ -566,6 +653,15 @@ class ColumnRecord extends DataClass implements Insertable<ColumnRecord> {
       options: options == null && nullToAbsent
           ? const Value.absent()
           : Value(options),
+      formula: formula == null && nullToAbsent
+          ? const Value.absent()
+          : Value(formula),
+      groupCalc: groupCalc == null && nullToAbsent
+          ? const Value.absent()
+          : Value(groupCalc),
+      calcCells: calcCells == null && nullToAbsent
+          ? const Value.absent()
+          : Value(calcCells),
     );
   }
 
@@ -584,6 +680,9 @@ class ColumnRecord extends DataClass implements Insertable<ColumnRecord> {
       reference: serializer.fromJson<String?>(json['reference']),
       style: serializer.fromJson<String?>(json['style']),
       options: serializer.fromJson<String?>(json['options']),
+      formula: serializer.fromJson<String?>(json['formula']),
+      groupCalc: serializer.fromJson<String?>(json['groupCalc']),
+      calcCells: serializer.fromJson<String?>(json['calcCells']),
     );
   }
   @override
@@ -599,6 +698,9 @@ class ColumnRecord extends DataClass implements Insertable<ColumnRecord> {
       'reference': serializer.toJson<String?>(reference),
       'style': serializer.toJson<String?>(style),
       'options': serializer.toJson<String?>(options),
+      'formula': serializer.toJson<String?>(formula),
+      'groupCalc': serializer.toJson<String?>(groupCalc),
+      'calcCells': serializer.toJson<String?>(calcCells),
     };
   }
 
@@ -612,6 +714,9 @@ class ColumnRecord extends DataClass implements Insertable<ColumnRecord> {
     Value<String?> reference = const Value.absent(),
     Value<String?> style = const Value.absent(),
     Value<String?> options = const Value.absent(),
+    Value<String?> formula = const Value.absent(),
+    Value<String?> groupCalc = const Value.absent(),
+    Value<String?> calcCells = const Value.absent(),
   }) => ColumnRecord(
     id: id ?? this.id,
     sheetId: sheetId ?? this.sheetId,
@@ -622,6 +727,9 @@ class ColumnRecord extends DataClass implements Insertable<ColumnRecord> {
     reference: reference.present ? reference.value : this.reference,
     style: style.present ? style.value : this.style,
     options: options.present ? options.value : this.options,
+    formula: formula.present ? formula.value : this.formula,
+    groupCalc: groupCalc.present ? groupCalc.value : this.groupCalc,
+    calcCells: calcCells.present ? calcCells.value : this.calcCells,
   );
   ColumnRecord copyWithCompanion(ColumnRecordsCompanion data) {
     return ColumnRecord(
@@ -634,6 +742,9 @@ class ColumnRecord extends DataClass implements Insertable<ColumnRecord> {
       reference: data.reference.present ? data.reference.value : this.reference,
       style: data.style.present ? data.style.value : this.style,
       options: data.options.present ? data.options.value : this.options,
+      formula: data.formula.present ? data.formula.value : this.formula,
+      groupCalc: data.groupCalc.present ? data.groupCalc.value : this.groupCalc,
+      calcCells: data.calcCells.present ? data.calcCells.value : this.calcCells,
     );
   }
 
@@ -648,7 +759,10 @@ class ColumnRecord extends DataClass implements Insertable<ColumnRecord> {
           ..write('width: $width, ')
           ..write('reference: $reference, ')
           ..write('style: $style, ')
-          ..write('options: $options')
+          ..write('options: $options, ')
+          ..write('formula: $formula, ')
+          ..write('groupCalc: $groupCalc, ')
+          ..write('calcCells: $calcCells')
           ..write(')'))
         .toString();
   }
@@ -664,6 +778,9 @@ class ColumnRecord extends DataClass implements Insertable<ColumnRecord> {
     reference,
     style,
     options,
+    formula,
+    groupCalc,
+    calcCells,
   );
   @override
   bool operator ==(Object other) =>
@@ -677,7 +794,10 @@ class ColumnRecord extends DataClass implements Insertable<ColumnRecord> {
           other.width == this.width &&
           other.reference == this.reference &&
           other.style == this.style &&
-          other.options == this.options);
+          other.options == this.options &&
+          other.formula == this.formula &&
+          other.groupCalc == this.groupCalc &&
+          other.calcCells == this.calcCells);
 }
 
 class ColumnRecordsCompanion extends UpdateCompanion<ColumnRecord> {
@@ -690,6 +810,9 @@ class ColumnRecordsCompanion extends UpdateCompanion<ColumnRecord> {
   final Value<String?> reference;
   final Value<String?> style;
   final Value<String?> options;
+  final Value<String?> formula;
+  final Value<String?> groupCalc;
+  final Value<String?> calcCells;
   final Value<int> rowid;
   const ColumnRecordsCompanion({
     this.id = const Value.absent(),
@@ -701,6 +824,9 @@ class ColumnRecordsCompanion extends UpdateCompanion<ColumnRecord> {
     this.reference = const Value.absent(),
     this.style = const Value.absent(),
     this.options = const Value.absent(),
+    this.formula = const Value.absent(),
+    this.groupCalc = const Value.absent(),
+    this.calcCells = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ColumnRecordsCompanion.insert({
@@ -713,6 +839,9 @@ class ColumnRecordsCompanion extends UpdateCompanion<ColumnRecord> {
     this.reference = const Value.absent(),
     this.style = const Value.absent(),
     this.options = const Value.absent(),
+    this.formula = const Value.absent(),
+    this.groupCalc = const Value.absent(),
+    this.calcCells = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        sheetId = Value(sheetId),
@@ -730,6 +859,9 @@ class ColumnRecordsCompanion extends UpdateCompanion<ColumnRecord> {
     Expression<String>? reference,
     Expression<String>? style,
     Expression<String>? options,
+    Expression<String>? formula,
+    Expression<String>? groupCalc,
+    Expression<String>? calcCells,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -742,6 +874,9 @@ class ColumnRecordsCompanion extends UpdateCompanion<ColumnRecord> {
       if (reference != null) 'reference': reference,
       if (style != null) 'style': style,
       if (options != null) 'options': options,
+      if (formula != null) 'formula': formula,
+      if (groupCalc != null) 'group_calc': groupCalc,
+      if (calcCells != null) 'calc_cells': calcCells,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -756,6 +891,9 @@ class ColumnRecordsCompanion extends UpdateCompanion<ColumnRecord> {
     Value<String?>? reference,
     Value<String?>? style,
     Value<String?>? options,
+    Value<String?>? formula,
+    Value<String?>? groupCalc,
+    Value<String?>? calcCells,
     Value<int>? rowid,
   }) {
     return ColumnRecordsCompanion(
@@ -768,6 +906,9 @@ class ColumnRecordsCompanion extends UpdateCompanion<ColumnRecord> {
       reference: reference ?? this.reference,
       style: style ?? this.style,
       options: options ?? this.options,
+      formula: formula ?? this.formula,
+      groupCalc: groupCalc ?? this.groupCalc,
+      calcCells: calcCells ?? this.calcCells,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -802,6 +943,15 @@ class ColumnRecordsCompanion extends UpdateCompanion<ColumnRecord> {
     if (options.present) {
       map['options'] = Variable<String>(options.value);
     }
+    if (formula.present) {
+      map['formula'] = Variable<String>(formula.value);
+    }
+    if (groupCalc.present) {
+      map['group_calc'] = Variable<String>(groupCalc.value);
+    }
+    if (calcCells.present) {
+      map['calc_cells'] = Variable<String>(calcCells.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -820,6 +970,9 @@ class ColumnRecordsCompanion extends UpdateCompanion<ColumnRecord> {
           ..write('reference: $reference, ')
           ..write('style: $style, ')
           ..write('options: $options, ')
+          ..write('formula: $formula, ')
+          ..write('groupCalc: $groupCalc, ')
+          ..write('calcCells: $calcCells, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2585,6 +2738,9 @@ typedef $$ColumnRecordsTableCreateCompanionBuilder =
       Value<String?> reference,
       Value<String?> style,
       Value<String?> options,
+      Value<String?> formula,
+      Value<String?> groupCalc,
+      Value<String?> calcCells,
       Value<int> rowid,
     });
 typedef $$ColumnRecordsTableUpdateCompanionBuilder =
@@ -2598,6 +2754,9 @@ typedef $$ColumnRecordsTableUpdateCompanionBuilder =
       Value<String?> reference,
       Value<String?> style,
       Value<String?> options,
+      Value<String?> formula,
+      Value<String?> groupCalc,
+      Value<String?> calcCells,
       Value<int> rowid,
     });
 
@@ -2714,6 +2873,21 @@ class $$ColumnRecordsTableFilterComposer
 
   ColumnFilters<String> get options => $composableBuilder(
     column: $table.options,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get formula => $composableBuilder(
+    column: $table.formula,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get groupCalc => $composableBuilder(
+    column: $table.groupCalc,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get calcCells => $composableBuilder(
+    column: $table.calcCells,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2840,6 +3014,21 @@ class $$ColumnRecordsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get formula => $composableBuilder(
+    column: $table.formula,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get groupCalc => $composableBuilder(
+    column: $table.groupCalc,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get calcCells => $composableBuilder(
+    column: $table.calcCells,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$SheetRecordsTableOrderingComposer get sheetId {
     final $$SheetRecordsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -2896,6 +3085,15 @@ class $$ColumnRecordsTableAnnotationComposer
 
   GeneratedColumn<String> get options =>
       $composableBuilder(column: $table.options, builder: (column) => column);
+
+  GeneratedColumn<String> get formula =>
+      $composableBuilder(column: $table.formula, builder: (column) => column);
+
+  GeneratedColumn<String> get groupCalc =>
+      $composableBuilder(column: $table.groupCalc, builder: (column) => column);
+
+  GeneratedColumn<String> get calcCells =>
+      $composableBuilder(column: $table.calcCells, builder: (column) => column);
 
   $$SheetRecordsTableAnnotationComposer get sheetId {
     final $$SheetRecordsTableAnnotationComposer composer = $composerBuilder(
@@ -3014,6 +3212,9 @@ class $$ColumnRecordsTableTableManager
                 Value<String?> reference = const Value.absent(),
                 Value<String?> style = const Value.absent(),
                 Value<String?> options = const Value.absent(),
+                Value<String?> formula = const Value.absent(),
+                Value<String?> groupCalc = const Value.absent(),
+                Value<String?> calcCells = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ColumnRecordsCompanion(
                 id: id,
@@ -3025,6 +3226,9 @@ class $$ColumnRecordsTableTableManager
                 reference: reference,
                 style: style,
                 options: options,
+                formula: formula,
+                groupCalc: groupCalc,
+                calcCells: calcCells,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3038,6 +3242,9 @@ class $$ColumnRecordsTableTableManager
                 Value<String?> reference = const Value.absent(),
                 Value<String?> style = const Value.absent(),
                 Value<String?> options = const Value.absent(),
+                Value<String?> formula = const Value.absent(),
+                Value<String?> groupCalc = const Value.absent(),
+                Value<String?> calcCells = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ColumnRecordsCompanion.insert(
                 id: id,
@@ -3049,6 +3256,9 @@ class $$ColumnRecordsTableTableManager
                 reference: reference,
                 style: style,
                 options: options,
+                formula: formula,
+                groupCalc: groupCalc,
+                calcCells: calcCells,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

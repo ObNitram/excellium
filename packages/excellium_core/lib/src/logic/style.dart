@@ -18,7 +18,8 @@ TextAlignment defaultAlignment(ColumnType type) => switch (type) {
   ColumnType.number ||
   ColumnType.percent ||
   ColumnType.date ||
-  ColumnType.duration => TextAlignment.right,
+  ColumnType.duration ||
+  ColumnType.formula => TextAlignment.right,
   ColumnType.boolean => TextAlignment.center,
   _ => TextAlignment.left,
 };

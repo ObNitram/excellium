@@ -120,6 +120,24 @@ List<String> decodeOptions(String? source) {
   }
 }
 
+/// Cases de calcul d'une colonne : numéro de ligne → contenu.
+String? encodeCalcCells(Map<int, String> cells) => cells.isEmpty
+    ? null
+    : jsonEncode({
+        for (final entry in cells.entries) '${entry.key}': entry.value,
+      });
+
+Map<int, String> decodeCalcCells(String? source) {
+  if (source == null) return const {};
+  final map = _decodeMap(source);
+  if (map == null) return const {};
+  return {
+    for (final entry in map.entries)
+      if (int.tryParse(entry.key) case final index?)
+        if (entry.value case final String content) index: content,
+  };
+}
+
 String encodeViewSpec(ViewSpec spec) => jsonEncode({
   'layout': spec.layout.kind.name,
   'key': spec.layout.keyColumnId?.value,
@@ -134,6 +152,7 @@ String encodeViewSpec(ViewSpec spec) => jsonEncode({
       entry.key.value: _encodeFilter(entry.value),
   },
   'hidden': [for (final id in spec.hiddenColumnIds) id.value],
+  'group': spec.groupBy?.value,
 });
 
 /// Une vue illisible redevient la vue complète, plutôt que de bloquer la
@@ -145,7 +164,9 @@ ViewSpec decodeViewSpec(String source) {
   final sort = map['sort'];
   final filters = map['filters'];
   final hidden = map['hidden'];
+  final group = map['group'];
   return ViewSpec(
+    groupBy: group is String ? ColumnId(group) : null,
     layout: ViewLayout(
       LayoutKind.values.asNameMap()[map['layout']] ?? LayoutKind.grid,
       key is String ? ColumnId(key) : null,

@@ -42,6 +42,7 @@ final class ViewSpec {
     this.layout = const ViewLayout.grid(),
     RowQuery? query,
     Iterable<ColumnId> hiddenColumnIds = const [],
+    this.groupBy,
   }) : query = query ?? RowQuery.none,
        hiddenColumnIds = Set.unmodifiable(hiddenColumnIds);
 
@@ -52,19 +53,27 @@ final class ViewSpec {
   final RowQuery query;
   final Set<ColumnId> hiddenColumnIds;
 
+  /// Colonne Catégorie ou Référence selon laquelle la grille est découpée en
+  /// groupes ; `null` sans regroupement.
+  final ColumnId? groupBy;
+
   bool get isFull =>
       layout.kind == LayoutKind.grid &&
       query.isEmpty &&
-      hiddenColumnIds.isEmpty;
+      hiddenColumnIds.isEmpty &&
+      groupBy == null;
 
   ViewSpec copyWith({
     ViewLayout? layout,
     RowQuery? query,
     Iterable<ColumnId>? hiddenColumnIds,
+    ColumnId? groupBy,
+    bool clearGroupBy = false,
   }) => ViewSpec(
     layout: layout ?? this.layout,
     query: query ?? this.query,
     hiddenColumnIds: hiddenColumnIds ?? this.hiddenColumnIds,
+    groupBy: clearGroupBy ? null : (groupBy ?? this.groupBy),
   );
 
   /// La même vue sans aucune mention de [columnId] : ni tri, ni filtre, ni
@@ -79,6 +88,7 @@ final class ViewSpec {
       },
     ),
     hiddenColumnIds: hiddenColumnIds.where((id) => id != columnId),
+    groupBy: groupBy == columnId ? null : groupBy,
   );
 
   /// Forme comparable : deux vues qui affichent la même chose sont égales,
@@ -87,6 +97,7 @@ final class ViewSpec {
     layout: layout,
     query: RowQuery(sort: query.sort, filters: query.activeFilters),
     hiddenColumnIds: hiddenColumnIds,
+    groupBy: groupBy,
   );
 
   @override
@@ -94,6 +105,7 @@ final class ViewSpec {
       other is ViewSpec &&
       other.layout == layout &&
       other.query == query &&
+      other.groupBy == groupBy &&
       const SetEquality<ColumnId>().equals(
         other.hiddenColumnIds,
         hiddenColumnIds,
@@ -103,6 +115,7 @@ final class ViewSpec {
   int get hashCode => Object.hash(
     layout,
     query,
+    groupBy,
     const SetEquality<ColumnId>().hash(hiddenColumnIds),
   );
 }

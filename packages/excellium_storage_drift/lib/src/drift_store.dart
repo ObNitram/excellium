@@ -140,6 +140,9 @@ final class _Columns implements ColumnRepository {
           : null,
       style: decodeCellStyle(record.style),
       options: decodeOptions(record.options),
+      formula: record.formula ?? '',
+      groupCalc: record.groupCalc ?? '',
+      calcCells: decodeCalcCells(record.calcCells),
     );
   }
 
@@ -207,6 +210,9 @@ final class _Columns implements ColumnRepository {
           reference: Value(_encodeReference(column)),
           style: Value(encodeCellStyle(column.style)),
           options: Value(encodeOptions(column.options)),
+          formula: Value(column.formula.isEmpty ? null : column.formula),
+          groupCalc: Value(column.groupCalc.isEmpty ? null : column.groupCalc),
+          calcCells: Value(encodeCalcCells(column.calcCells)),
         ),
       );
 

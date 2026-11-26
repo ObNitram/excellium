@@ -4,6 +4,8 @@ library;
 
 export 'src/logic/cell_input.dart';
 export 'src/logic/categories.dart';
+export 'src/logic/formulas.dart';
+export 'src/logic/grouping.dart';
 export 'src/logic/references.dart';
 export 'src/logic/row_query.dart';
 export 'src/logic/style.dart';
@@ -15,5 +17,6 @@ export 'src/model/row.dart';
 export 'src/model/sheet.dart';
 export 'src/model/style.dart';
 export 'src/model/view.dart';
+export 'src/ports/formula.dart';
 export 'src/ports/store.dart';
 export 'src/usecases/workbook_service.dart';

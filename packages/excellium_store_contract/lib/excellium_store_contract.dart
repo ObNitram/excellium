@@ -357,6 +357,68 @@ void runStoreContractTests(
       });
     });
 
+    group('formules et cases de calcul', () {
+      late Sheet sheet;
+
+      setUp(() async => sheet = await store.sheets.createSheet(name: 'F'));
+
+      test('une colonne Formule garde sa formule', () async {
+        final column = await store.columns.addColumn(
+          sheet.id,
+          name: 'Total',
+          type: ColumnType.formula,
+        );
+        expect(column.type, ColumnType.formula);
+        expect(column.formula, isEmpty);
+
+        await store.columns.updateColumn(
+          column.copyWith(formula: 'Quantité × Prix'),
+        );
+
+        final saved = (await store.columns.getColumns(sheet.id)).single;
+        expect(saved.type, ColumnType.formula);
+        expect(saved.formula, 'Quantité × Prix');
+      });
+
+      test('la case de regroupement et les cases de calcul sont '
+          'enregistrées', () async {
+        final column = await store.columns.addColumn(sheet.id, name: 'Budget');
+
+        await store.columns.updateColumn(
+          column.copyWith(
+            groupCalc: '=Somme(Budget)',
+            calcCells: const {0: 'Total', 2: '=Moyenne(Budget)'},
+          ),
+        );
+
+        final saved = (await store.columns.getColumns(sheet.id)).single;
+        expect(saved.groupCalc, '=Somme(Budget)');
+        expect(saved.calcCells, {0: 'Total', 2: '=Moyenne(Budget)'});
+
+        // Les vider les retire.
+        await store.columns.updateColumn(
+          saved.copyWith(groupCalc: '', calcCells: const {}),
+        );
+        final cleared = (await store.columns.getColumns(sheet.id)).single;
+        expect(cleared.groupCalc, isEmpty);
+        expect(cleared.calcCells, isEmpty);
+      });
+
+      test('le regroupement fait partie d\'une vue', () async {
+        final column = await store.columns.addColumn(
+          sheet.id,
+          type: ColumnType.singleCategory,
+        );
+        final spec = ViewSpec(groupBy: column.id);
+
+        await store.views.createView(sheet.id, name: 'Par statut', spec: spec);
+
+        final saved = (await store.views.getViews(sheet.id)).single;
+        expect(saved.spec.groupBy, column.id);
+        expect(saved.spec, spec);
+      });
+    });
+
     group('vues enregistrées', () {
       late Sheet sheet;
       late ColumnDef status;

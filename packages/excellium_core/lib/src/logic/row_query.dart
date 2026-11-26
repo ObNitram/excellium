@@ -9,18 +9,31 @@ import '../model/row.dart';
 /// Donne le libellé d'une ligne référencée, pour trier une colonne Référence.
 typedef ReferenceLabel = String Function(RowId rowId);
 
+/// Donne la valeur calculée d'une colonne Formule sur une ligne.
+typedef ComputedValue = double? Function(SheetRow row, ColumnDef column);
+
 /// Applique les filtres puis le tri de [query] à [rows].
 ///
 /// Les lignes sont rendues dans un nouvel ordre sans être modifiées : leur
 /// `position` d'origine est conservée. Dès qu'un filtre est actif, les lignes
 /// entièrement vides sont masquées. Les cellules vides de la colonne triée
 /// sont placées à la fin, quel que soit le sens du tri.
+///
+/// Une colonne Formule n'a pas de cellules : [computed] donne ses valeurs,
+/// qui se trient et se filtrent comme des nombres.
 List<SheetRow> applyRowQuery(
   List<SheetRow> rows,
   List<ColumnDef> columns,
   RowQuery query, {
   ReferenceLabel? referenceLabel,
+  ComputedValue? computed,
 }) {
+  CellValue? valueOf(SheetRow row, ColumnDef column) {
+    if (column.type != ColumnType.formula) return row[column.id];
+    final number = computed?.call(row, column);
+    return number == null ? null : NumberValue(number);
+  }
+
   final byId = {for (final column in columns) column.id: column};
   final filters = [
     for (final entry in query.activeFilters.entries)
@@ -33,7 +46,7 @@ List<SheetRow> applyRowQuery(
     result = [
       for (final row in result)
         if (!row.isEmpty &&
-            filters.every((f) => _matches(row[f.$1.id], f.$1, f.$2)))
+            filters.every((f) => _matches(valueOf(row, f.$1), f.$1, f.$2)))
           row,
     ];
   }
@@ -45,7 +58,12 @@ List<SheetRow> applyRowQuery(
   final withKey = <(SheetRow, Comparable<Object>)>[];
   final withoutKey = <SheetRow>[];
   for (final row in result) {
-    final key = _sortKey(row[sortColumn.id], sortColumn, row, referenceLabel);
+    final key = _sortKey(
+      valueOf(row, sortColumn),
+      sortColumn,
+      row,
+      referenceLabel,
+    );
     if (key == null) {
       withoutKey.add(row);
     } else {

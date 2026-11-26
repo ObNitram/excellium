@@ -325,6 +325,26 @@ final class WorkbookService {
   Future<void> configureReference(ColumnDef column, ReferenceConfig config) =>
       _store.columns.updateColumn(column.copyWith(reference: config));
 
+  /// Fixe la formule d'une colonne Formule.
+  Future<void> setFormula(ColumnDef column, String formula) =>
+      _store.columns.updateColumn(column.copyWith(formula: formula));
+
+  /// Fixe le contenu de la case de [column] sur les lignes de regroupement.
+  Future<void> setGroupCalc(ColumnDef column, String content) =>
+      _store.columns.updateColumn(column.copyWith(groupCalc: content));
+
+  /// Fixe le contenu d'une case de calcul sous [column], à la ligne [index]
+  /// (à partir de 0). Un contenu vide retire la case.
+  Future<void> setCalcCell(ColumnDef column, int index, String content) {
+    final cells = Map<int, String>.of(column.calcCells);
+    if (content.trim().isEmpty) {
+      cells.remove(index);
+    } else {
+      cells[index] = content;
+    }
+    return _store.columns.updateColumn(column.copyWith(calcCells: cells));
+  }
+
   /// Enregistre une vue. Sans [name], elle s'appelle « Vue N ».
   Future<SavedView> saveView(SheetId sheetId, ViewSpec spec, {String? name}) {
     return _store.transaction(() async {

@@ -40,6 +40,15 @@ class ColumnRecords extends Table {
   /// Catégories définies, en JSON ; `null` s'il n'y en a pas.
   TextColumn get options => text().nullable()();
 
+  /// Formule d'une colonne Formule ; `null` s'il n'y en a pas.
+  TextColumn get formula => text().nullable()();
+
+  /// Contenu de la case de la colonne sur les lignes de regroupement.
+  TextColumn get groupCalc => text().nullable()();
+
+  /// Cases de calcul sous la colonne, en JSON (numéro de ligne → contenu).
+  TextColumn get calcCells => text().nullable()();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
@@ -128,8 +137,10 @@ class ExcelliumDatabase extends _$ExcelliumDatabase {
 
   /// Version 2 : styles de colonne et de cellule, catégories définies,
   /// hauteur de ligne, vues enregistrées.
+  ///
+  /// Version 3 : formule de colonne, case de regroupement, cases de calcul.
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -140,6 +151,11 @@ class ExcelliumDatabase extends _$ExcelliumDatabase {
         await m.addColumn(rowRecords, rowRecords.height);
         await m.createTable(cellStyleRecords);
         await m.createTable(viewRecords);
+      }
+      if (from < 3) {
+        await m.addColumn(columnRecords, columnRecords.formula);
+        await m.addColumn(columnRecords, columnRecords.groupCalc);
+        await m.addColumn(columnRecords, columnRecords.calcCells);
       }
     },
     beforeOpen: (details) async {

@@ -9,4 +9,5 @@ workspace:
   - packages/excellium_core
   - packages/excellium_store_contract
   - packages/excellium_storage_drift
+  - packages/excellium_formula
   - app
