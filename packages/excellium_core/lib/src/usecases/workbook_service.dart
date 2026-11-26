@@ -51,6 +51,179 @@ final class WorkbookService {
     });
   }
 
+  /// Renomme une feuille. Un nom vide est refusé : le nom ne change pas.
+  Future<void> renameSheet(Sheet sheet, String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty || trimmed == sheet.name) return;
+    await _store.sheets.renameSheet(sheet.id, trimmed);
+  }
+
+  /// Supprime une feuille avec tout son contenu.
+  ///
+  /// Les colonnes Référence des autres feuilles qui la visaient perdent leur
+  /// feuille liée et leurs valeurs. Renvoie `false`, sans rien changer, si
+  /// c'est la dernière feuille du classeur : il en reste toujours une.
+  Future<bool> deleteSheet(SheetId id) {
+    return _store.transaction(() async {
+      final sheets = await _store.sheets.getSheets();
+      if (sheets.length <= 1 || !sheets.any((sheet) => sheet.id == id)) {
+        return false;
+      }
+      for (final other in sheets) {
+        if (other.id == id) continue;
+        final columns = await _store.columns.getColumns(other.id);
+        final linked = [
+          for (final column in columns)
+            if (column.reference?.targetSheetId == id) column,
+        ];
+        if (linked.isEmpty) continue;
+        final rows = await _store.rows.getRows(other.id);
+        for (final column in linked) {
+          await _store.columns.updateColumn(
+            column.copyWith(
+              reference: ReferenceConfig(
+                cardinality: column.reference!.cardinality,
+              ),
+            ),
+          );
+          for (final row in rows) {
+            if (row[column.id] != null) {
+              await _store.rows.setCell(row.id, column.id, null);
+            }
+          }
+        }
+      }
+      await _store.sheets.deleteSheet(id);
+      return true;
+    });
+  }
+
+  /// Supprime une colonne et ses cellules.
+  ///
+  /// Les vues enregistrées de la feuille et les recherches des colonnes
+  /// Référence qui la citaient sont mises à jour. Renvoie `false`, sans rien
+  /// changer, si c'est la dernière colonne de la feuille.
+  Future<bool> deleteColumn(ColumnDef column) {
+    return _store.transaction(() async {
+      final columns = await _store.columns.getColumns(column.sheetId);
+      if (columns.length <= 1 || !columns.any((c) => c.id == column.id)) {
+        return false;
+      }
+      for (final sheet in await _store.sheets.getSheets()) {
+        for (final other in await _store.columns.getColumns(sheet.id)) {
+          final reference = other.reference;
+          if (other.id == column.id ||
+              reference == null ||
+              !reference.searchColumnIds.contains(column.id)) {
+            continue;
+          }
+          await _store.columns.updateColumn(
+            other.copyWith(
+              reference: reference.copyWith(
+                searchColumnIds: [
+                  for (final id in reference.searchColumnIds)
+                    if (id != column.id) id,
+                ],
+              ),
+            ),
+          );
+        }
+      }
+      for (final view in await _store.views.getViews(column.sheetId)) {
+        final cleaned = view.spec.withoutColumn(column.id);
+        if (cleaned != view.spec) {
+          await _store.views.updateView(view.copyWith(spec: cleaned));
+        }
+      }
+      await _store.columns.deleteColumn(column.id);
+      return true;
+    });
+  }
+
+  /// Supprime une ligne, et la retire des cellules Référence qui la visaient.
+  Future<void> deleteRow(SheetRow row) {
+    return _store.transaction(() async {
+      for (final sheet in await _store.sheets.getSheets()) {
+        final linked = [
+          for (final column in await _store.columns.getColumns(sheet.id))
+            if (column.reference?.targetSheetId == row.sheetId) column,
+        ];
+        if (linked.isEmpty) continue;
+        for (final other in await _store.rows.getRows(sheet.id)) {
+          for (final column in linked) {
+            final value = other[column.id];
+            if (value is! ReferenceValue || !value.rowIds.contains(row.id)) {
+              continue;
+            }
+            final rest = [
+              for (final id in value.rowIds)
+                if (id != row.id) id,
+            ];
+            await _store.rows.setCell(
+              other.id,
+              column.id,
+              rest.isEmpty ? null : ReferenceValue(rest),
+            );
+          }
+        }
+      }
+      await _store.rows.deleteRow(row.id);
+    });
+  }
+
+  /// Crée une ligne avec [values] : la première ligne entièrement vide de la
+  /// feuille est réutilisée, sinon une ligne est ajoutée à la fin.
+  ///
+  /// Sert aux affichages qui créent une ligne déjà remplie, comme une carte
+  /// de kanban.
+  Future<SheetRow> addRowWith(
+    SheetId sheetId,
+    Map<ColumnId, CellValue> values,
+  ) {
+    return _store.transaction(() async {
+      final columns = {
+        for (final column in await _store.columns.getColumns(sheetId))
+          column.id: column,
+      };
+      for (final MapEntry(key: columnId, :value) in values.entries) {
+        final column = columns[columnId];
+        if (column == null || !value.fits(column.type)) {
+          throw ArgumentError.value(
+            value,
+            'values',
+            'incompatible avec la colonne ${columnId.value}',
+          );
+        }
+      }
+      final rows = await _store.rows.getRows(sheetId);
+      SheetRow? target;
+      for (final row in rows) {
+        if (row.isEmpty) {
+          target = row;
+          break;
+        }
+      }
+      target ??= await _store.rows.addRow(sheetId);
+      for (final MapEntry(key: columnId, :value) in values.entries) {
+        await _store.rows.setCell(target.id, columnId, value);
+      }
+      return (await _store.rows.getRows(sheetId))
+          .firstWhere((row) => row.id == target!.id);
+    });
+  }
+
+  /// Ajoute une catégorie à une colonne, sans l'affecter à une cellule : une
+  /// nouvelle étape de kanban, par exemple. Renvoie `false` si le nom est
+  /// vide ou déjà défini.
+  Future<bool> addCategory(ColumnDef column, String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty || column.options.contains(trimmed)) return false;
+    await _store.columns.updateColumn(
+      column.copyWith(options: [...column.options, trimmed]),
+    );
+    return true;
+  }
+
   /// Déplace une feuille du rang [from] au rang [to].
   Future<void> moveSheet(int from, int to) async {
     final sheets = await _store.sheets.getSheets();

@@ -123,6 +123,18 @@ Régénérer le code Drift après une modification du schéma
 cd packages/excellium_storage_drift && dart run build_runner build
 ```
 
+## Suppressions
+
+Les suppressions sont définitives (il n'y a pas encore d'annulation) : une
+confirmation annonce ce qui sera perdu. Elles passent par `WorkbookService`,
+qui garde le classeur cohérent :
+
+- supprimer une feuille vide les colonnes Référence qui la visaient ;
+- supprimer une colonne la retire des vues enregistrées et des recherches des
+  colonnes Référence ;
+- supprimer une ligne la retire des cellules Référence qui la visaient ;
+- il reste toujours au moins une feuille, et au moins une colonne par feuille.
+
 ## Où sont les données
 
 La base SQLite `excellium.sqlite` est créée dans le dossier de données de
@@ -133,10 +145,12 @@ l'application fourni par le système (sous Linux,
 
 Fait :
 
-- feuilles en onglets (ajout, déplacement par glisser-déposer) ;
+- feuilles en onglets : ajout, déplacement par glisser-déposer, renommage
+  (double-clic ou menu de l'onglet), suppression ;
 - colonnes typées avec changement de type et conversion des valeurs, renommage
   (double-clic sur l'en-tête), largeur réglable, déplacement par
-  glisser-déposer, hauteur des lignes réglable ;
+  glisser-déposer, suppression (menu de la colonne), hauteur des lignes
+  réglable, suppression d'une ligne (clic sur son numéro) ;
 - sélection d'une cellule ou d'une colonne entière (clic sur l'en-tête) ;
 - barre de style, limitée aux réglages qui ont un sens pour le type : gras,
   italique, souligné, alignement, booléen en case à cocher, interrupteur ou
@@ -150,13 +164,13 @@ Fait :
 - colonnes masquées, vues enregistrées (affichage, tri, filtres, colonnes) ;
 - affichages Grille, Kanban (à partir d'une colonne Catégorie unique) et
   Calendrier (à partir d'une colonne Date), avec glisser-déposer des lignes ;
+- dans le kanban, création d'une carte (une ligne) dans une étape et d'une
+  étape (une catégorie de la colonne) ;
 - persistance SQLite, avec migration du schéma.
 
 Pas encore fait :
 
-- supprimer ou renommer une feuille, supprimer une colonne ou une ligne depuis
-  l'interface (le cœur et le stockage savent le faire) ;
-- créer une ligne depuis le kanban ou le calendrier ;
+- créer une ligne depuis le calendrier ;
 - menus de la barre de titre (Fichier, Édition…), annuler / rétablir,
   copier-coller, sélection de plusieurs cellules, navigation au clavier dans la
   grille ;

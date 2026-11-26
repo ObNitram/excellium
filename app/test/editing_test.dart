@@ -1,4 +1,5 @@
 import 'package:excellium_app/features/editing/edit_bar.dart';
+import 'package:excellium_app/features/styling/style_bar.dart';
 import 'package:excellium_core/excellium_core.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -150,8 +151,17 @@ void main() {
   testWidgets('la barre d\'édition garde sa hauteur d\'un type à l\'autre', (
     tester,
   ) async {
-    await select(tester, 'A1');
+    await pumpApp(tester, book.store);
+    await tester.tap(find.text('Tâches'));
+    await tester.pumpAndSettle();
+    // Sans sélection, les deux barres ont déjà leur hauteur définitive.
     final height = tester.getSize(find.byType(EditBar)).height;
+    final styleHeight = tester.getSize(find.byType(StyleBar)).height;
+
+    await tester.tap(cell('A1'));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(find.byType(EditBar)).height, height);
+    expect(tester.getSize(find.byType(StyleBar)).height, styleHeight);
 
     for (final column in ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']) {
       await tester.tap(cell('${column}1'));

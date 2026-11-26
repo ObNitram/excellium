@@ -6,9 +6,11 @@ import '../../app/theme.dart';
 import '../../shared/popover.dart';
 import '../../shared/providers.dart';
 import '../grid/column_type_ui.dart';
+import '../grid/grid_providers.dart';
 import '../views/view_providers.dart';
 import '../workbook/workbook_providers.dart';
 import 'column_filter_editor.dart';
+import 'delete_column.dart';
 import 'rename_column.dart';
 
 /// Menu d'une colonne : tri, filtre, masquage, affichages, renommage, type et
@@ -45,6 +47,7 @@ class _ColumnMenuState extends ConsumerState<ColumnMenu> {
     final sort = spec.query.sort;
     final sortedHere = sort?.columnId == column.id;
     final filterOn = spec.query.activeFilters.containsKey(column.id);
+    final columnCount = ref.watch(columnsProvider(sheetId)).value?.length ?? 1;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -156,6 +159,19 @@ class _ColumnMenuState extends ConsumerState<ColumnMenu> {
           if (column.type == ColumnType.reference)
             ReferenceConfigEditor(column: column),
         ],
+        const Divider(height: 12),
+        PanelItem(
+          icon: Icons.delete_outline,
+          label: 'Supprimer la colonne',
+          danger: true,
+          // Il reste toujours au moins une colonne dans la feuille.
+          onTap: columnCount > 1
+              ? () {
+                  widget.close();
+                  deleteColumn(context, column);
+                }
+              : null,
+        ),
       ],
     );
   }

@@ -67,6 +67,20 @@ final class ViewSpec {
     hiddenColumnIds: hiddenColumnIds ?? this.hiddenColumnIds,
   );
 
+  /// La même vue sans aucune mention de [columnId] : ni tri, ni filtre, ni
+  /// masquage, ni clé d'affichage. Sert quand la colonne est supprimée.
+  ViewSpec withoutColumn(ColumnId columnId) => ViewSpec(
+    layout: layout.keyColumnId == columnId ? ViewLayout(layout.kind) : layout,
+    query: RowQuery(
+      sort: query.sort?.columnId == columnId ? null : query.sort,
+      filters: {
+        for (final entry in query.filters.entries)
+          if (entry.key != columnId) entry.key: entry.value,
+      },
+    ),
+    hiddenColumnIds: hiddenColumnIds.where((id) => id != columnId),
+  );
+
   /// Forme comparable : deux vues qui affichent la même chose sont égales,
   /// même si l'une garde un filtre vide.
   ViewSpec get normalized => ViewSpec(
@@ -109,6 +123,15 @@ final class SavedView {
   final String name;
   final int position;
   final ViewSpec spec;
+
+  SavedView copyWith({String? name, int? position, ViewSpec? spec}) =>
+      SavedView(
+        id: id,
+        sheetId: sheetId,
+        name: name ?? this.name,
+        position: position ?? this.position,
+        spec: spec ?? this.spec,
+      );
 
   @override
   bool operator ==(Object other) =>

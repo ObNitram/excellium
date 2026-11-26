@@ -338,17 +338,19 @@ final class _Views implements ViewRepository {
   }
 
   @override
+  Future<void> updateView(SavedView view) async {
+    final current = _store._views[view.id];
+    if (current == null) return;
+    _store._views[view.id] = current.copyWith(name: view.name, spec: view.spec);
+    _store._notify();
+  }
+
+  @override
   Future<void> deleteView(ViewId id) async {
     final view = _store._views.remove(id);
     if (view == null) return;
     for (final (index, other) in _store._sortedViews(view.sheetId).indexed) {
-      _store._views[other.id] = SavedView(
-        id: other.id,
-        sheetId: other.sheetId,
-        name: other.name,
-        position: index,
-        spec: other.spec,
-      );
+      _store._views[other.id] = other.copyWith(position: index);
     }
     _store._notify();
   }

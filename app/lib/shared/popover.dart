@@ -14,6 +14,7 @@ class Popover extends StatefulWidget {
     required this.anchorBuilder,
     required this.panelBuilder,
     this.width = 280,
+    this.above = false,
   });
 
   /// Construit le bouton ; `toggle` ouvre ou ferme le panneau.
@@ -24,6 +25,10 @@ class Popover extends StatefulWidget {
   final Widget Function(BuildContext context, VoidCallback close) panelBuilder;
 
   final double width;
+
+  /// Ouvre le panneau au-dessus du bouton plutôt qu'en dessous : pour un
+  /// bouton placé en bas de la fenêtre.
+  final bool above;
 
   @override
   State<Popover> createState() => _PopoverState();
@@ -56,11 +61,17 @@ class _PopoverState extends State<Popover> {
             ),
             CompositedTransformFollower(
               link: _link,
-              targetAnchor: Alignment.bottomLeft,
-              followerAnchor: Alignment.topLeft,
-              offset: const Offset(0, 4),
+              targetAnchor: widget.above
+                  ? Alignment.topLeft
+                  : Alignment.bottomLeft,
+              followerAnchor: widget.above
+                  ? Alignment.bottomLeft
+                  : Alignment.topLeft,
+              offset: Offset(0, widget.above ? -4 : 4),
               child: Align(
-                alignment: Alignment.topLeft,
+                alignment: widget.above
+                    ? Alignment.bottomLeft
+                    : Alignment.topLeft,
                 child: CallbackShortcuts(
                   bindings: {
                     const SingleActivator(LogicalKeyboardKey.escape): _close,
@@ -165,20 +176,32 @@ class PanelItem extends StatelessWidget {
     required this.onTap,
     this.icon,
     this.selected = false,
+    this.danger = false,
     this.trailing,
   });
 
   final String label;
-  final VoidCallback onTap;
+
+  /// `null` désactive l'entrée.
+  final VoidCallback? onTap;
   final IconData? icon;
   final bool selected;
+
+  /// Action destructrice, écrite en rouge.
+  final bool danger;
   final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppColors.accent : AppColors.text;
+    final enabled = onTap != null;
+    final color = !enabled
+        ? AppColors.textMuted
+        : danger
+        ? AppColors.danger
+        : (selected ? AppColors.accent : AppColors.text);
     return Semantics(
       button: true,
+      enabled: enabled,
       selected: selected,
       child: InkWell(
         onTap: onTap,
@@ -196,7 +219,7 @@ class PanelItem extends StatelessWidget {
                 Icon(
                   icon,
                   size: 16,
-                  color: selected ? color : AppColors.textMuted,
+                  color: selected || danger ? color : AppColors.textMuted,
                 ),
                 const SizedBox(width: 10),
               ],

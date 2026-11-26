@@ -23,7 +23,8 @@ class StyleBar extends ConsumerWidget {
     final selection = ref.watch(selectionProvider);
 
     return Container(
-      constraints: const BoxConstraints(minHeight: AppSizes.barHeight),
+      // + 1 pour la bordure : la barre a la même hauteur vide ou remplie.
+      constraints: const BoxConstraints(minHeight: AppSizes.barHeight + 1),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: const BoxDecoration(
         color: AppColors.surface,

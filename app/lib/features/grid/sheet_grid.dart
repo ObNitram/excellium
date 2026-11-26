@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
+import '../../shared/confirm.dart';
+import '../../shared/popover.dart';
 import '../../shared/providers.dart';
 import '../columns/column_header.dart';
 import '../views/view_providers.dart';
@@ -178,6 +180,24 @@ class _RowNumber extends ConsumerStatefulWidget {
 class _RowNumberState extends ConsumerState<_RowNumber> {
   double? _dragHeight;
 
+  /// Supprime la ligne ; une confirmation est demandée si elle a du contenu.
+  Future<void> _delete() async {
+    final row = widget.row;
+    final service = ref.read(workbookServiceProvider);
+    if (!row.isEmpty) {
+      final filled = row.cells.length;
+      final confirmed = await confirmDelete(
+        context,
+        title: 'Supprimer la ligne ${row.position + 1} ?',
+        message:
+            '${filled > 1 ? 'Ses $filled valeurs seront perdues' : 'Sa valeur sera perdue'}'
+            '. Cette action est définitive.',
+      );
+      if (!confirmed) return;
+    }
+    await service.deleteRow(row);
+  }
+
   @override
   Widget build(BuildContext context) {
     final active = widget.active;
@@ -197,13 +217,39 @@ class _RowNumberState extends ConsumerState<_RowNumber> {
       ),
       child: Stack(
         children: [
-          Center(
-            child: Text(
-              '${row.position + 1}',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-                color: active ? AppColors.accent : AppColors.textMuted,
+          // Un clic sur le numéro ouvre le menu de la ligne.
+          Positioned.fill(
+            child: Popover(
+              width: 220,
+              anchorBuilder: (context, toggle, isOpen) => Tooltip(
+                message: 'Options de la ligne ${row.position + 1}',
+                waitDuration: const Duration(milliseconds: 600),
+                child: InkWell(
+                  onTap: toggle,
+                  child: Center(
+                    child: Text(
+                      '${row.position + 1}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: active || isOpen
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                        color: active || isOpen
+                            ? AppColors.accent
+                            : AppColors.textMuted,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              panelBuilder: (context, close) => PanelItem(
+                icon: Icons.delete_outline,
+                label: 'Supprimer la ligne ${row.position + 1}',
+                danger: true,
+                onTap: () {
+                  close();
+                  _delete();
+                },
               ),
             ),
           ),

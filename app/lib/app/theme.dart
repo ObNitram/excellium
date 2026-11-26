@@ -33,6 +33,10 @@ ThemeData buildTheme() {
     colorScheme: scheme,
     scaffoldBackgroundColor: AppColors.surface,
     visualDensity: VisualDensity.compact,
+    // Dimensions de bureau, quelle que soit la plateforme : sans cela les
+    // boutons seraient plus grands sur mobile, et dans les tests, qui
+    // s'exécutent par défaut avec les réglages mobiles.
+    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
     textTheme: const TextTheme(
       bodyMedium: TextStyle(fontSize: 13, color: AppColors.text),
       bodySmall: TextStyle(fontSize: 12, color: AppColors.textMuted),

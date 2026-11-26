@@ -67,6 +67,10 @@ class ViewSpecNotifier extends Notifier<ViewSpec> {
   }
 
   void showAllColumns() => state = state.copyWith(hiddenColumnIds: const []);
+
+  /// Retire toute mention d'une colonne supprimée : tri, filtre, masquage,
+  /// clé d'affichage.
+  void forgetColumn(ColumnId columnId) => state = state.withoutColumn(columnId);
 }
 
 /// Les vues enregistrées d'une feuille.

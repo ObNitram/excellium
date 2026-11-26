@@ -94,6 +94,9 @@ abstract interface class ViewRepository {
     required ViewSpec spec,
   });
 
+  /// Enregistre le nom et le contenu de [view]. Le rang ne change pas.
+  Future<void> updateView(SavedView view);
+
   Future<void> deleteView(ViewId id);
 }
 

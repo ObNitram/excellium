@@ -440,6 +440,32 @@ void runStoreContractTests(
         expect(views.single.position, 0);
       });
 
+      test(
+        'modifier une vue change son nom et son contenu, pas son rang',
+        () async {
+          await store.views.createView(
+            sheet.id,
+            name: 'A',
+            spec: ViewSpec.full,
+          );
+          final b = await store.views.createView(
+            sheet.id,
+            name: 'B',
+            spec: ViewSpec.full,
+          );
+          final spec = ViewSpec(layout: const ViewLayout.kanban());
+
+          await store.views.updateView(
+            b.copyWith(name: 'Suivi', spec: spec, position: 0),
+          );
+
+          final views = await store.views.getViews(sheet.id);
+          expect(views.map((v) => v.name), ['A', 'Suivi']);
+          expect(views.last.spec, spec);
+          expect(views.last.position, 1);
+        },
+      );
+
       test('supprimer une feuille supprime ses vues', () async {
         await store.views.createView(sheet.id, name: 'A', spec: ViewSpec.full);
         await store.sheets.deleteSheet(sheet.id);

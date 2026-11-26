@@ -470,6 +470,17 @@ final class _Views implements ViewRepository {
   }
 
   @override
+  Future<void> updateView(SavedView view) =>
+      (_db.update(
+        _db.viewRecords,
+      )..where((t) => t.id.equals(view.id.value))).write(
+        ViewRecordsCompanion(
+          name: Value(view.name),
+          spec: Value(encodeViewSpec(view.spec)),
+        ),
+      );
+
+  @override
   Future<void> deleteView(ViewId id) {
     return _db.transaction(() async {
       final record = await (_db.select(
