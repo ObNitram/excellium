@@ -41,6 +41,37 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Clique à la souris, comme dans l'application de bureau : un clic hors
+  /// d'un champ lui retire le focus.
+  Future<void> click(WidgetTester tester, Finder target) async {
+    await tester.tap(target, kind: PointerDeviceKind.mouse);
+    await tester.pumpAndSettle();
+  }
+
+  // Comme dans l'application de bureau, où un champ qui reçoit le focus
+  // sélectionne tout son texte.
+  final desktop = TargetPlatformVariant.only(TargetPlatform.linux);
+
+  /// Le champ qui reçoit ce qu'on tape, s'il y en a un.
+  TextEditingController? focused(WidgetTester tester) {
+    for (final field in tester.widgetList<EditableText>(
+      find.byType(EditableText),
+    )) {
+      if (field.focusNode.hasFocus) return field.controller;
+    }
+    return null;
+  }
+
+  String? focusedText(WidgetTester tester) => focused(tester)?.text;
+
+  /// Vrai si le curseur est à la fin du champ, sans rien de sélectionné :
+  /// taper complète le texte au lieu de le remplacer.
+  bool caretAtEnd(WidgetTester tester) {
+    final field = focused(tester)!;
+    return field.selection ==
+        TextSelection.collapsed(offset: field.text.length);
+  }
+
   Finder calcCell(int row, String column) =>
       find.bySemanticsLabel(RegExp('^Case de calcul $row, colonne $column'));
 
@@ -117,6 +148,24 @@ void main() {
       // Les états intermédiaires étaient des erreurs : elles ont disparu.
       expect(find.text('#ERREUR'), findsNothing);
     });
+
+    testWidgets('un clic sur une cellule calculée ouvre la formule', (
+      tester,
+    ) async {
+      await addFormula('Budget * 2');
+      await openTasks(tester);
+
+      await click(tester, cell('J1'));
+      expect(focusedText(tester), 'Budget * 2');
+      // Chaque frappe est enregistrée pour toute la colonne : le curseur est
+      // à la fin, une touche ne remplace pas la formule.
+      expect(caretAtEnd(tester), isTrue);
+
+      // Une autre ligne de la même colonne : c'est la même formule.
+      await click(tester, cell('J3'));
+      expect(focusedText(tester), 'Budget * 2');
+      expect(caretAtEnd(tester), isTrue);
+    }, variant: desktop);
 
     testWidgets('une formule incorrecte affiche #ERREUR et un message', (
       tester,
@@ -258,6 +307,30 @@ void main() {
       expect(find.text('La formule est incomplète.'), findsOneWidget);
       expect(tester.getSize(find.byType(EditBar)).height, height);
     });
+
+    testWidgets('un clic sur une case ouvre la saisie, même déjà '
+        'sélectionnée', (tester) async {
+      await openTasks(tester);
+      await click(tester, calcCell(1, 'Budget'));
+      expect(focusedText(tester), '');
+
+      tester.testTextInput.enterText('=Max(Budget)');
+      await tester.pumpAndSettle();
+      expect(textIn(calcCell(1, 'Budget'), '1 200'), findsOneWidget);
+
+      // À la souris, le second clic retire le focus du champ puis le rend.
+      await click(tester, calcCell(1, 'Budget'));
+      expect(focusedText(tester), '=Max(Budget)');
+      expect(caretAtEnd(tester), isTrue);
+
+      await click(tester, calcCell(2, 'Durée'));
+      expect(focusedText(tester), '');
+
+      // Revenir sur une case remplie : on complète son calcul.
+      await click(tester, calcCell(1, 'Budget'));
+      expect(focusedText(tester), '=Max(Budget)');
+      expect(caretAtEnd(tester), isTrue);
+    }, variant: desktop);
 
     testWidgets('les boutons de fonction écrivent dans la case', (
       tester,
@@ -526,8 +599,12 @@ void main() {
       expect(await book.rows(), hasLength(4));
       expect(await book.cell(3, 'Statut'), CategoryValue.single('Terminé'));
       expect(find.bySemanticsLabel('Groupe Terminé, 2 lignes'), findsOneWidget);
-      // La nouvelle ligne est prête à être remplie.
+      // La nouvelle ligne est prête à être remplie : on tape son nom.
       expect(editReference('A4'), findsOneWidget);
+      tester.testTextInput.enterText('Bilan');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(await book.cell(3, 'Tâche'), const TextValue('Bilan'));
     });
 
     testWidgets('un filtre masque les groupes qu\'il vide', (tester) async {
@@ -631,6 +708,21 @@ void main() {
       expect(textIn(groupCalc('À faire', 'Budget'), '850'), findsOneWidget);
       expect(textIn(groupCalc('Terminé', 'Budget'), '600'), findsOneWidget);
     });
+
+    testWidgets('un clic sur l\'opération d\'un autre groupe garde la saisie', (
+      tester,
+    ) async {
+      await grouped(tester);
+      await click(tester, groupCalc('En cours', 'Budget'));
+      tester.testTextInput.enterText('=Somme(Budget)');
+      await tester.pumpAndSettle();
+
+      // Même colonne, autre groupe : le contenu est le même, et le champ
+      // reprend la saisie.
+      await click(tester, groupCalc('Terminé', 'Budget'));
+      expect(focusedText(tester), '=Somme(Budget)');
+      expect(caretAtEnd(tester), isTrue);
+    }, variant: desktop);
 
     testWidgets('moyenne d\'une colonne par groupe', (tester) async {
       await book.service.setGroupCalc(

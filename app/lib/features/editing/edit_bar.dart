@@ -24,6 +24,7 @@ class _EditBarState extends ConsumerState<EditBar> {
   final _controller = TextEditingController();
   final _categoryController = TextEditingController();
   final _focusNode = FocusNode();
+  final _categoryFocus = FocusNode();
   CellInputError? _error;
 
   @override
@@ -31,6 +32,7 @@ class _EditBarState extends ConsumerState<EditBar> {
     _controller.dispose();
     _categoryController.dispose();
     _focusNode.dispose();
+    _categoryFocus.dispose();
     super.dispose();
   }
 
@@ -62,14 +64,53 @@ class _EditBarState extends ConsumerState<EditBar> {
         ref
             .read(selectionProvider.notifier)
             .select(rows[index + 1].id, cell.column.id);
+        _startEditing();
+        return;
       }
     }
     _focusNode.requestFocus();
   }
 
+  /// Donne la saisie à l'éditeur de la cellule sélectionnée, une fois la
+  /// barre reconstruite pour elle. Le texte est sélectionné en entier :
+  /// taper remplace la valeur, comme dans un tableur.
+  ///
+  /// Un booléen ou une référence n'ont pas de champ de saisie : rien ne se
+  /// passe. Les formules et les cases de calcul ont leur propre champ, qui
+  /// suit [editRequestProvider] de son côté.
+  void _startEditing() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // Le champ à viser dépend du type de la colonne affichée maintenant,
+      // pas des champs qui ont existé pour la cellule précédente.
+      switch (ref.read(selectedCellProvider)?.column.type) {
+        case ColumnType.text:
+        case ColumnType.number:
+        case ColumnType.percent:
+        case ColumnType.date:
+        case ColumnType.duration:
+          _focusNode.requestFocus();
+          _controller.selection = TextSelection(
+            baseOffset: 0,
+            extentOffset: _controller.text.length,
+          );
+        case ColumnType.singleCategory:
+        case ColumnType.multiCategory:
+          _categoryFocus.requestFocus();
+        case ColumnType.boolean:
+        case ColumnType.reference:
+        case ColumnType.formula:
+        case null:
+          break;
+      }
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen(selectedCellProvider, (_, next) => _sync(next));
+    ref.listen(editRequestProvider, (_, _) => _startEditing());
     final cell = ref.watch(selectedCellProvider);
     final selection = ref.watch(selectionProvider);
     final column = ref.watch(selectedColumnProvider);
@@ -399,6 +440,7 @@ class _EditBarState extends ConsumerState<EditBar> {
           width: 170,
           child: TextField(
             controller: _categoryController,
+            focusNode: _categoryFocus,
             style: const TextStyle(fontSize: 13),
             decoration: const InputDecoration(
               isDense: true,

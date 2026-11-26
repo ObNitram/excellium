@@ -228,7 +228,7 @@ class _CalcGridState extends ConsumerState<CalcGrid> {
                                 selection.columnId == column.id,
                             onTap: () => ref
                                 .read(selectionProvider.notifier)
-                                .selectCalcCell(index, column.id),
+                                .selectCalcCell(index, column.id, edit: true),
                           ),
                       ],
                     ),

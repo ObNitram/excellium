@@ -1,6 +1,7 @@
 import 'package:excellium_app/features/editing/edit_bar.dart';
 import 'package:excellium_app/features/styling/style_bar.dart';
 import 'package:excellium_core/excellium_core.dart';
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -19,6 +20,133 @@ void main() {
     await tester.tap(cell(reference));
     await tester.pumpAndSettle();
   }
+
+  group('saisie immédiate', () {
+    // Comme dans l'application de bureau : souris, et règles de focus et de
+    // sélection d'un ordinateur.
+    final desktop = TargetPlatformVariant.only(TargetPlatform.linux);
+
+    /// Clique à la souris : un clic hors d'un champ lui retire le focus.
+    Future<void> click(WidgetTester tester, Finder target) async {
+      await tester.tap(target, kind: PointerDeviceKind.mouse);
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> open(WidgetTester tester) async {
+      await pumpApp(tester, book.store);
+      await tester.tap(find.text('Tâches'));
+      await tester.pumpAndSettle();
+    }
+
+    /// Le champ qui reçoit ce qu'on tape, s'il y en a un.
+    EditableText? focusedField(WidgetTester tester) {
+      for (final field in tester.widgetList<EditableText>(
+        find.byType(EditableText),
+      )) {
+        if (field.focusNode.hasFocus) return field;
+      }
+      return null;
+    }
+
+    testWidgets('un clic sur une cellule ouvre la saisie, texte sélectionné', (
+      tester,
+    ) async {
+      await open(tester);
+      expect(focusedField(tester), isNull);
+
+      await click(tester, cell('A2'));
+
+      final field = focusedField(tester)!;
+      expect(field.controller.text, 'Import CSV');
+      // Tout est sélectionné : taper remplace la valeur.
+      expect(
+        field.controller.selection,
+        const TextSelection(baseOffset: 0, extentOffset: 10),
+      );
+
+      // On tape sans avoir cliqué dans la barre d'édition.
+      tester.testTextInput.enterText('Export');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(await book.cell(1, 'Tâche'), const TextValue('Export'));
+    }, variant: desktop);
+
+    testWidgets('après Entrée, la ligne suivante est prête à être remplacée', (
+      tester,
+    ) async {
+      await open(tester);
+      await click(tester, cell('B1'));
+
+      tester.testTextInput.enterText('1500');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+
+      expect(await book.cell(0, 'Budget'), const NumberValue(1500));
+      expect(editReference('B2'), findsOneWidget);
+      final field = focusedField(tester)!;
+      expect(field.controller.text, '850');
+      expect(
+        field.controller.selection,
+        const TextSelection(baseOffset: 0, extentOffset: 3),
+      );
+    }, variant: desktop);
+
+    testWidgets('recliquer sur la cellule sélectionnée rend la saisie', (
+      tester,
+    ) async {
+      await open(tester);
+      await click(tester, cell('A1'));
+      await click(tester, cell('A1'));
+
+      expect(focusedField(tester)?.controller.text, 'Maquette');
+    }, variant: desktop);
+
+    testWidgets('passer d\'un type de colonne à l\'autre garde la saisie', (
+      tester,
+    ) async {
+      await open(tester);
+      await click(tester, cell('A1'));
+      await click(tester, cell('F2'));
+      expect(focusedField(tester)?.controller.text, '11/12/2026');
+
+      await click(tester, cell('G3'));
+      tester.testTextInput.enterText('2h15');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(
+        await book.cell(2, 'Durée'),
+        const DurationValue(Duration(hours: 2, minutes: 15)),
+      );
+    }, variant: desktop);
+
+    testWidgets('catégorie : le clic ouvre le champ « Nouvelle catégorie »', (
+      tester,
+    ) async {
+      await open(tester);
+      // En venant d'une cellule Texte, dont le champ vient de disparaître.
+      await click(tester, cell('A1'));
+      await click(tester, cell('C2'));
+
+      expect(focusedField(tester)?.controller.text, '');
+      tester.testTextInput.enterText('Bloqué');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(await book.cell(1, 'Statut'), CategoryValue.single('Bloqué'));
+    }, variant: desktop);
+
+    testWidgets(
+      'booléen ou référence : pas de champ, rien ne prend la saisie',
+      (tester) async {
+        await open(tester);
+        await click(tester, cell('A1'));
+
+        await click(tester, cell('I2'));
+        expect(editReference('I2'), findsOneWidget);
+        expect(focusedField(tester), isNull);
+      },
+      variant: desktop,
+    );
+  });
 
   testWidgets('nombre : les boutons − et + changent la valeur de 1', (
     tester,

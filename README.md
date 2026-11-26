@@ -235,6 +235,10 @@ Fait :
 - barre d'édition adaptée au type : texte, nombre, pourcentage, date, durée,
   catégories en pastilles, Vrai / Faux, recherche d'une ligne dans la feuille
   liée (avec choix des colonnes de recherche et relation 1 – n ou n – n) ;
+- saisie immédiate : un clic sur une cellule ou une case de calcul donne la
+  saisie à la barre d'édition, on tape tout de suite. Le texte d'une cellule
+  est sélectionné (taper le remplace, Entrée passe à la ligne suivante) ;
+  dans une formule ou un calcul, le curseur se place à la fin ;
 - tri et filtres depuis le menu de la colonne, critères rappelés dans la barre
   de vue ;
 - colonnes masquées, vues enregistrées (affichage, tri, filtres, colonnes) ;

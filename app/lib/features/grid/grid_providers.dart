@@ -105,18 +105,46 @@ class Selection extends Notifier<GridSelection?> {
     return null;
   }
 
-  void select(RowId rowId, ColumnId columnId) =>
-      state = CellSelected(rowId, columnId);
+  /// Sélectionne une cellule. Avec [edit], la barre d'édition prend la
+  /// saisie : c'est le cas quand on clique sur la cellule dans la grille.
+  void select(RowId rowId, ColumnId columnId, {bool edit = false}) {
+    state = CellSelected(rowId, columnId);
+    if (edit) _requestEdit();
+  }
 
   void selectColumn(ColumnId columnId) => state = ColumnSelected(columnId);
 
-  void selectCalcCell(int index, ColumnId columnId) =>
-      state = CalcCellSelected(index, columnId);
+  void selectCalcCell(int index, ColumnId columnId, {bool edit = false}) {
+    state = CalcCellSelected(index, columnId);
+    if (edit) _requestEdit();
+  }
 
-  void selectGroupCalc(ColumnId columnId, String groupKey) =>
-      state = GroupCalcSelected(columnId, groupKey);
+  void selectGroupCalc(
+    ColumnId columnId,
+    String groupKey, {
+    bool edit = false,
+  }) {
+    state = GroupCalcSelected(columnId, groupKey);
+    if (edit) _requestEdit();
+  }
 
   void clear() => state = null;
+
+  void _requestEdit() => ref.read(editRequestProvider.notifier).request();
+}
+
+/// Demandes de saisie immédiate : la valeur change à chaque clic sur une
+/// case, et la barre d'édition y répond en donnant le focus à son champ.
+///
+/// C'est un signal à part de la sélection, parce que cliquer une seconde
+/// fois sur la case déjà sélectionnée doit aussi rendre la main au champ.
+final editRequestProvider = NotifierProvider<EditRequest, int>(EditRequest.new);
+
+class EditRequest extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void request() => state++;
 }
 
 /// La cellule sélectionnée avec sa ligne et sa colonne à jour ; `null` si

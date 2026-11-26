@@ -38,8 +38,11 @@ class CellView extends ConsumerWidget {
       label: 'Cellule ${column.letter}${row.position + 1}',
       selected: selected,
       child: InkWell(
-        onTap: () =>
-            ref.read(selectionProvider.notifier).select(row.id, column.id),
+        // Un clic sélectionne la cellule et ouvre la saisie : on tape tout
+        // de suite, sans passer par la barre d'édition.
+        onTap: () => ref
+            .read(selectionProvider.notifier)
+            .select(row.id, column.id, edit: true),
         child: Container(
           width: width,
           height: height,

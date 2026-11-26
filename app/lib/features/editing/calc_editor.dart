@@ -23,6 +23,7 @@ class _FormulaField extends StatefulWidget {
     required this.hint,
     required this.error,
     this.autofocus = false,
+    this.focusSignal = 0,
     this.leading,
     this.trailing = const [],
     this.note,
@@ -40,6 +41,10 @@ class _FormulaField extends StatefulWidget {
 
   /// Vrai pour prendre le focus dès que [identity] change.
   final bool autofocus;
+
+  /// Le champ reprend le focus chaque fois que cette valeur change : c'est
+  /// le compteur des clics sur une case (voir [editRequestProvider]).
+  final int focusSignal;
   final Widget? leading;
 
   /// Boutons placés après le champ ; ils reçoivent de quoi y écrire.
@@ -56,10 +61,39 @@ class _FormulaFieldState extends State<_FormulaField> {
   late final _controller = TextEditingController(text: widget.text);
   final _focus = FocusNode();
 
+  /// Vrai entre le moment où le champ demande le focus de lui-même et celui
+  /// où il l'obtient.
+  bool _caretToEnd = false;
+
   @override
   void initState() {
     super.initState();
-    if (widget.autofocus) _focus.requestFocus();
+    _focus.addListener(_onFocusChanged);
+    if (widget.autofocus) _takeFocus();
+  }
+
+  /// Prend la saisie, le curseur à la fin du texte : on complète la formule.
+  ///
+  /// Sur ordinateur, un champ qui reçoit le focus sans qu'on ait cliqué
+  /// dedans sélectionne tout son texte. Ici chaque frappe est enregistrée :
+  /// une touche effacerait la formule de toute la colonne. On replace donc
+  /// le curseur à la fin, mais seulement quand c'est le champ qui a demandé
+  /// le focus, pas quand on clique dedans pour choisir où écrire.
+  void _takeFocus() {
+    if (!_focus.hasFocus) _caretToEnd = true;
+    _focus.requestFocus();
+  }
+
+  void _onFocusChanged() {
+    if (!_focus.hasFocus || !_caretToEnd) return;
+    _caretToEnd = false;
+    // Après la sélection automatique du champ, faite sur ce même évènement.
+    Future.microtask(() {
+      if (!mounted) return;
+      _controller.selection = TextSelection.collapsed(
+        offset: _controller.text.length,
+      );
+    });
   }
 
   @override
@@ -70,14 +104,19 @@ class _FormulaFieldState extends State<_FormulaField> {
     // effacerait ce qui vient d'être tapé ou inséré.
     if (old.identity != widget.identity) {
       _controller.text = widget.text;
-      if (widget.autofocus) _focus.requestFocus();
+      if (widget.autofocus) _takeFocus();
     }
+    // Un clic sur la case, même déjà sélectionnée, rend la saisie au champ :
+    // à la souris, cliquer hors du champ lui retire le focus.
+    if (old.focusSignal != widget.focusSignal) _takeFocus();
   }
 
   @override
   void dispose() {
     _controller.dispose();
-    _focus.dispose();
+    _focus
+      ..removeListener(_onFocusChanged)
+      ..dispose();
     super.dispose();
   }
 
@@ -89,7 +128,7 @@ class _FormulaFieldState extends State<_FormulaField> {
       selection: TextSelection.collapsed(offset: next.length),
     );
     widget.onChanged(next);
-    _focus.requestFocus();
+    _takeFocus();
   }
 
   @override
@@ -212,6 +251,7 @@ class FormulaEditor extends ConsumerWidget {
       // Le champ prend le focus dès que la colonne est choisie : on écrit la
       // formule tout de suite après avoir donné le type Formule.
       autofocus: true,
+      focusSignal: ref.watch(editRequestProvider),
       error: values.error,
       note: 'Calculée pour chaque ligne',
       leading: const Padding(
@@ -279,6 +319,7 @@ class _CalcEditorState extends ConsumerState<CalcEditor> {
       hint: 'Texte, ou calcul : =Somme(Budget)',
       error: display.error,
       autofocus: true,
+      focusSignal: ref.watch(editRequestProvider),
       trailing: [
         for (final function in formulas.functions)
           if (function.kind == FormulaFunctionKind.column)

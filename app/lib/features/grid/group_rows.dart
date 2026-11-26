@@ -157,7 +157,7 @@ class GroupHeader extends ConsumerWidget {
                     selection.groupKey == group.key,
                 onTap: () => ref
                     .read(selectionProvider.notifier)
-                    .selectGroupCalc(other.id, group.key),
+                    .selectGroupCalc(other.id, group.key, edit: true),
               ),
           ],
         ),
@@ -205,7 +205,9 @@ class GroupAddRow extends ConsumerWidget {
               {column.id: value},
             );
             final target = firstColumn;
-            if (target != null) selection.select(created.id, target.id);
+            if (target != null) {
+              selection.select(created.id, target.id, edit: true);
+            }
           },
           child: Container(
             height: height,
