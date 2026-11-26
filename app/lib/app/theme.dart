@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 abstract final class AppColors {
   static const accent = Color(0xFF3D4FD6);
   static const accentTint = Color(0xFFE4E7FA);
+  static const columnTint = Color(0xFFF3F4FD);
   static const text = Color(0xFF1C2026);
   static const textMuted = Color(0xFF5A6270);
   static const textSubtle = Color(0xFF3A414C);

@@ -18,17 +18,20 @@ du cœur, jamais l'inverse.
 
 ### Le cœur (`excellium_core`)
 
-- `model/` : `Sheet`, `ColumnDef`, `SheetRow`, `CellValue`, critères de tri et
-  de filtre. Les cellules sont rattachées à l'identifiant de leur colonne, pas
-  à sa lettre ni à sa position.
+- `model/` : `Sheet`, `ColumnDef`, `SheetRow`, `CellValue`, styles
+  (`CellStyle`), critères de tri et de filtre, vues (`ViewSpec`, `SavedView`).
+  Les cellules sont rattachées à l'identifiant de leur colonne, pas à sa lettre
+  ni à sa position.
 - `logic/` : interprétation d'une saisie selon le type de colonne
-  (`parseCellInput`), conversion lors d'un changement de type, application du
-  tri et des filtres (`applyRowQuery`).
-- `ports/` : `SheetRepository`, `ColumnRepository`, `RowRepository` et
-  `ExcelliumStore`. Ce sont les seules choses que le reste du code connaît du
-  stockage.
+  (`parseCellInput`), conversion lors d'un changement de type, tri et filtres
+  (`applyRowQuery`), style effectif d'une cellule (`resolveStyle`), catégories
+  d'une colonne, libellé et recherche des lignes référencées.
+- `ports/` : `SheetRepository`, `ColumnRepository`, `RowRepository`,
+  `ViewRepository` et `ExcelliumStore`. Ce sont les seules choses que le reste
+  du code connaît du stockage.
 - `usecases/` : `WorkbookService`, pour les actions qui enchaînent plusieurs
-  écritures (créer une feuille, changer le type d'une colonne…).
+  écritures ou portent une règle (créer une feuille, changer le type d'une
+  colonne, styler une colonne, déplacer, enregistrer une vue…).
 - `memory.dart` : un stockage en mémoire, utilisé par les tests de l'interface.
 
 ### L'application (`app`)
@@ -37,21 +40,35 @@ du cœur, jamais l'inverse.
 lib/
   main.dart            racine de composition : ouvre le stockage et l'injecte
   bootstrap/           seul dossier autorisé à connaître Drift
-  shared/providers.dart    storeProvider, workbookServiceProvider
   app/                 MaterialApp, thème, écran d'erreur de démarrage
+  shared/              providers du stockage, panneau flottant, glisser-déposer
   features/
-    workbook/          onglets, feuille active
-    grid/              grille, en-têtes de colonne, rendu des cellules
-    editing/           barre d'édition
+    workbook/          écran principal, onglets, feuille active
+    grid/              grille, rendu des cellules, sélection
+    columns/           en-tête de colonne, menu, filtre, renommage
+    styling/           barre de style
+    editing/           barre d'édition, choix d'une ligne référencée
+    views/             vue en cours, vues enregistrées, barre de vue
+    kanban/            affichage Kanban
+    calendar/          affichage Calendrier
 ```
 
-Les écrans lisent l'état par des providers Riverpod (`sheetsProvider`,
-`columnsProvider`, `rowsProvider`, `selectionProvider`) et agissent en appelant
-`WorkbookService` ou les dépôts à travers `storeProvider`.
+Les écrans lisent l'état par des providers Riverpod écrits à la main (sans
+génération de code) et agissent en appelant `WorkbookService`, ou les dépôts à
+travers `storeProvider`. Les principaux :
+
+- `sheetsProvider`, `columnsProvider`, `rowsProvider`, `savedViewsProvider` :
+  flux issus du stockage ;
+- `selectionProvider` : cellule ou colonne sélectionnée ;
+- `viewSpecProvider` : vue en cours d'une feuille (affichage, tri, filtres,
+  colonnes masquées). Elle vit en mémoire ; seules les vues enregistrées vont
+  dans le stockage ;
+- `visibleColumnsProvider`, `visibleRowsProvider` : ce que la vue en cours
+  laisse voir, partagé par la grille, le kanban et le calendrier.
 
 ## Changer de moteur de stockage
 
-1. Créer un paquet qui implémente `ExcelliumStore` et ses trois dépôts.
+1. Créer un paquet qui implémente `ExcelliumStore` et ses quatre dépôts.
 2. Lui faire passer la suite de contrat :
 
    ```dart
@@ -114,14 +131,35 @@ l'application fourni par le système (sous Linux,
 
 ## État actuel
 
-Fait : onglets, grille, colonnes typées avec changement de type et conversion
-des valeurs, renommage de colonne, saisie par la barre d'édition avec
-validation, cases à cocher, ajout de feuille, de colonne et de ligne,
-persistance SQLite.
+Fait :
 
-Le cœur sait déjà trier et filtrer (`applyRowQuery`), mais l'interface ne
-l'expose pas encore.
+- feuilles en onglets (ajout, déplacement par glisser-déposer) ;
+- colonnes typées avec changement de type et conversion des valeurs, renommage
+  (double-clic sur l'en-tête), largeur réglable, déplacement par
+  glisser-déposer, hauteur des lignes réglable ;
+- sélection d'une cellule ou d'une colonne entière (clic sur l'en-tête) ;
+- barre de style, limitée aux réglages qui ont un sens pour le type : gras,
+  italique, souligné, alignement, booléen en case à cocher, interrupteur ou
+  texte, pourcentage en valeur ou en barre de progression ; par colonne ou par
+  cellule ;
+- barre d'édition adaptée au type : texte, nombre, pourcentage, date, durée,
+  catégories en pastilles, Vrai / Faux, recherche d'une ligne dans la feuille
+  liée (avec choix des colonnes de recherche et relation 1 – n ou n – n) ;
+- tri et filtres depuis le menu de la colonne, critères rappelés dans la barre
+  de vue ;
+- colonnes masquées, vues enregistrées (affichage, tri, filtres, colonnes) ;
+- affichages Grille, Kanban (à partir d'une colonne Catégorie unique) et
+  Calendrier (à partir d'une colonne Date), avec glisser-déposer des lignes ;
+- persistance SQLite, avec migration du schéma.
 
-Pas encore fait, par rapport à la maquette : barre de style, choix d'une ligne
-référencée, tri et filtres à l'écran, vues enregistrées, colonnes masquées,
-kanban, calendrier, redimensionnement et déplacement des colonnes à la souris.
+Pas encore fait :
+
+- supprimer ou renommer une feuille, supprimer une colonne ou une ligne depuis
+  l'interface (le cœur et le stockage savent le faire) ;
+- créer une ligne depuis le kanban ou le calendrier ;
+- menus de la barre de titre (Fichier, Édition…), annuler / rétablir,
+  copier-coller, sélection de plusieurs cellules, navigation au clavier dans la
+  grille ;
+- styles de police, de couleur et de bordure, formats de nombre ;
+- sélecteur de date en français (il s'affiche en anglais) ;
+- import et export.

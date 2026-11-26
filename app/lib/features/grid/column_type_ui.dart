@@ -27,8 +27,13 @@ extension ColumnTypeUi on ColumnType {
     ColumnType.reference => Icons.link,
   };
 
-  /// Les valeurs s'alignent à droite pour les types numériques.
-  bool get alignsRight => switch (this) {
+  bool get isCategory =>
+      this == ColumnType.singleCategory || this == ColumnType.multiCategory;
+
+  /// Les valeurs de ce type sont du texte que l'on peut mettre en gras, en
+  /// italique ou souligner.
+  bool get hasTextStyle => switch (this) {
+    ColumnType.text ||
     ColumnType.number ||
     ColumnType.percent ||
     ColumnType.date ||
@@ -36,3 +41,8 @@ extension ColumnTypeUi on ColumnType {
     _ => false,
   };
 }
+
+/// Titre d'une colonne dans les menus : son nom, sinon « Colonne A ».
+String columnTitle(ColumnDef column) => column.name.trim().isEmpty
+    ? 'Colonne ${column.letter}'
+    : column.name.trim();

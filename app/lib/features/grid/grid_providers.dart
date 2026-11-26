@@ -14,39 +14,81 @@ final rowsProvider = StreamProvider.family<List<SheetRow>, SheetId>(
   (ref, sheetId) => ref.watch(storeProvider).rows.watchRows(sheetId),
 );
 
-/// Coordonnées d'une cellule, par identifiants stables.
-typedef CellRef = ({RowId rowId, ColumnId columnId});
+/// Libellé de chaque ligne d'une feuille, pour l'afficher là où elle est
+/// référencée.
+final rowLabelsProvider = Provider.family<Map<RowId, String>, SheetId>((
+  ref,
+  sheetId,
+) {
+  final columns = ref.watch(columnsProvider(sheetId)).value ?? const [];
+  final rows = ref.watch(rowsProvider(sheetId)).value ?? const [];
+  return {for (final row in rows) row.id: rowLabel(row, columns)};
+});
 
-/// La cellule sélectionnée dans la feuille affichée.
-final selectionProvider = NotifierProvider<Selection, CellRef?>(Selection.new);
+/// Ce qui est sélectionné dans la feuille : une cellule ou une colonne
+/// entière.
+sealed class GridSelection {
+  const GridSelection(this.columnId);
 
-class Selection extends Notifier<CellRef?> {
+  final ColumnId columnId;
+}
+
+final class CellSelected extends GridSelection {
+  const CellSelected(this.rowId, super.columnId);
+
+  final RowId rowId;
+
   @override
-  CellRef? build() {
+  bool operator ==(Object other) =>
+      other is CellSelected &&
+      other.rowId == rowId &&
+      other.columnId == columnId;
+
+  @override
+  int get hashCode => Object.hash(rowId, columnId);
+}
+
+final class ColumnSelected extends GridSelection {
+  const ColumnSelected(super.columnId);
+
+  @override
+  bool operator ==(Object other) =>
+      other is ColumnSelected && other.columnId == columnId;
+
+  @override
+  int get hashCode => Object.hash(ColumnSelected, columnId);
+}
+
+final selectionProvider = NotifierProvider<Selection, GridSelection?>(
+  Selection.new,
+);
+
+class Selection extends Notifier<GridSelection?> {
+  @override
+  GridSelection? build() {
     // Changer d'onglet annule la sélection.
     ref.watch(activeSheetProvider.select((sheet) => sheet?.id));
     return null;
   }
 
   void select(RowId rowId, ColumnId columnId) =>
-      state = (rowId: rowId, columnId: columnId);
+      state = CellSelected(rowId, columnId);
+
+  void selectColumn(ColumnId columnId) => state = ColumnSelected(columnId);
 
   void clear() => state = null;
 }
 
-/// La cellule sélectionnée avec sa ligne et sa colonne à jour.
+/// La cellule sélectionnée avec sa ligne et sa colonne à jour ; `null` si
+/// rien n'est sélectionné ou si c'est une colonne entière.
 typedef SelectedCell = ({SheetRow row, ColumnDef column});
 
 final selectedCellProvider = Provider<SelectedCell?>((ref) {
   final sheet = ref.watch(activeSheetProvider);
   final selection = ref.watch(selectionProvider);
-  if (sheet == null || selection == null) return null;
-  final columns = ref.watch(columnsProvider(sheet.id)).value ?? const [];
+  if (sheet == null || selection is! CellSelected) return null;
+  final column = _findColumn(ref, sheet.id, selection.columnId);
   final rows = ref.watch(rowsProvider(sheet.id)).value ?? const [];
-  ColumnDef? column;
-  for (final candidate in columns) {
-    if (candidate.id == selection.columnId) column = candidate;
-  }
   SheetRow? row;
   for (final candidate in rows) {
     if (candidate.id == selection.rowId) row = candidate;
@@ -54,3 +96,41 @@ final selectedCellProvider = Provider<SelectedCell?>((ref) {
   if (column == null || row == null) return null;
   return (row: row, column: column);
 });
+
+/// La colonne concernée par la sélection : celle de la cellule sélectionnée,
+/// ou la colonne sélectionnée en entier.
+final selectedColumnProvider = Provider<ColumnDef?>((ref) {
+  final sheet = ref.watch(activeSheetProvider);
+  final selection = ref.watch(selectionProvider);
+  if (sheet == null || selection == null) return null;
+  return _findColumn(ref, sheet.id, selection.columnId);
+});
+
+ColumnDef? _findColumn(Ref ref, SheetId sheetId, ColumnId columnId) {
+  final columns = ref.watch(columnsProvider(sheetId)).value ?? const [];
+  for (final column in columns) {
+    if (column.id == columnId) return column;
+  }
+  return null;
+}
+
+/// Taille en cours de réglage à la souris, avant d'être enregistrée : la
+/// grille suit le geste sans écrire dans le stockage à chaque pixel.
+typedef ResizePreview = ({String id, double size});
+
+final columnResizeProvider = NotifierProvider<ResizeState, ResizePreview?>(
+  ResizeState.new,
+);
+
+final rowResizeProvider = NotifierProvider<ResizeState, ResizePreview?>(
+  ResizeState.new,
+);
+
+class ResizeState extends Notifier<ResizePreview?> {
+  @override
+  ResizePreview? build() => null;
+
+  void update(String id, double size) => state = (id: id, size: size);
+
+  void end() => state = null;
+}

@@ -4,11 +4,13 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
 import '../../shared/providers.dart';
+import '../columns/column_header.dart';
+import '../views/view_providers.dart';
 import 'cell_view.dart';
-import 'column_header.dart';
 import 'grid_providers.dart';
 
 /// La grille d'une feuille : en-têtes de colonnes, numéros de ligne, cellules.
+/// Elle n'affiche que les colonnes et les lignes retenues par la vue en cours.
 class SheetGrid extends ConsumerWidget {
   const SheetGrid({super.key, required this.sheet});
 
@@ -16,16 +18,31 @@ class SheetGrid extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final columns = ref.watch(columnsProvider(sheet.id)).value;
-    final rows = ref.watch(rowsProvider(sheet.id)).value;
-    if (columns == null || rows == null) {
+    final allColumns = ref.watch(columnsProvider(sheet.id)).value;
+    final allRows = ref.watch(rowsProvider(sheet.id)).value;
+    if (allColumns == null || allRows == null) {
       return const Center(child: CircularProgressIndicator());
     }
+    final columns = ref.watch(visibleColumnsProvider(sheet.id));
+    final rows = ref.watch(visibleRowsProvider(sheet.id));
     final selection = ref.watch(selectionProvider);
+    final columnPreview = ref.watch(columnResizeProvider);
+    final rowPreview = ref.watch(rowResizeProvider);
+    final filtered = ref.watch(
+      viewSpecProvider(sheet.id)
+          .select((s) => s.query.activeFilters.isNotEmpty),
+    );
+
+    double widthOf(ColumnDef column) => columnPreview?.id == column.id.value
+        ? columnPreview!.size
+        : column.width;
+    double heightOf(SheetRow row) => rowPreview?.id == row.id.value
+        ? rowPreview!.size
+        : (row.height ?? SheetRow.defaultHeight);
 
     final width =
         AppSizes.rowHeaderWidth +
-        columns.fold<double>(0, (sum, column) => sum + column.width) +
+        columns.fold<double>(0, (sum, column) => sum + widthOf(column)) +
         _AddButton.size;
 
     return LayoutBuilder(
@@ -44,7 +61,8 @@ class SheetGrid extends ConsumerWidget {
                     ColumnHeader(
                       key: ValueKey(column.id),
                       column: column,
-                      active: selection?.columnId == column.id,
+                      width: widthOf(column),
+                      allColumns: allColumns,
                     ),
                   _AddButton(
                     tooltip: 'Ajouter une colonne',
@@ -56,9 +74,22 @@ class SheetGrid extends ConsumerWidget {
               Expanded(
                 child: ListView.builder(
                   itemCount: rows.length + 1,
-                  itemExtent: AppSizes.rowHeight,
                   itemBuilder: (context, index) {
                     if (index == rows.length) {
+                      if (filtered) {
+                        return Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Text(
+                            rows.isEmpty
+                                ? 'Aucune ligne ne correspond aux filtres.'
+                                : 'Des lignes sont masquées par les filtres.',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                        );
+                      }
                       return Align(
                         alignment: Alignment.centerLeft,
                         child: _AddButton(
@@ -70,20 +101,30 @@ class SheetGrid extends ConsumerWidget {
                       );
                     }
                     final row = rows[index];
+                    final height = heightOf(row);
                     return Row(
                       key: ValueKey(row.id),
                       children: [
                         _RowNumber(
-                          number: row.position + 1,
-                          active: selection?.rowId == row.id,
+                          row: row,
+                          height: height,
+                          active:
+                              selection is CellSelected &&
+                              selection.rowId == row.id,
                         ),
                         for (final column in columns)
                           CellView(
                             row: row,
                             column: column,
+                            width: widthOf(column),
+                            height: height,
                             selected:
-                                selection?.rowId == row.id &&
-                                selection?.columnId == column.id,
+                                selection is CellSelected &&
+                                selection.rowId == row.id &&
+                                selection.columnId == column.id,
+                            inSelectedColumn:
+                                selection is ColumnSelected &&
+                                selection.columnId == column.id,
                           ),
                       ],
                     );
@@ -117,18 +158,33 @@ class _Corner extends StatelessWidget {
   }
 }
 
-class _RowNumber extends StatelessWidget {
-  const _RowNumber({required this.number, required this.active});
+/// Numéro d'une ligne, avec une poignée sur son bord bas pour en régler la
+/// hauteur (double-clic : hauteur par défaut).
+class _RowNumber extends ConsumerStatefulWidget {
+  const _RowNumber({
+    required this.row,
+    required this.height,
+    required this.active,
+  });
 
-  final int number;
+  final SheetRow row;
+  final double height;
   final bool active;
 
   @override
+  ConsumerState<_RowNumber> createState() => _RowNumberState();
+}
+
+class _RowNumberState extends ConsumerState<_RowNumber> {
+  double? _dragHeight;
+
+  @override
   Widget build(BuildContext context) {
+    final active = widget.active;
+    final row = widget.row;
     return Container(
       width: AppSizes.rowHeaderWidth,
-      height: AppSizes.rowHeight,
-      alignment: Alignment.center,
+      height: widget.height,
       decoration: BoxDecoration(
         color: active ? AppColors.accentTint : AppColors.header,
         border: Border(
@@ -139,13 +195,61 @@ class _RowNumber extends StatelessWidget {
           bottom: const BorderSide(color: AppColors.headerLine),
         ),
       ),
-      child: Text(
-        '$number',
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-          color: active ? AppColors.accent : AppColors.textMuted,
-        ),
+      child: Stack(
+        children: [
+          Center(
+            child: Text(
+              '${row.position + 1}',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                color: active ? AppColors.accent : AppColors.textMuted,
+              ),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 5,
+            child: Semantics(
+              container: true,
+              label: 'Régler la hauteur de la ligne ${row.position + 1}',
+              child: MouseRegion(
+                cursor: SystemMouseCursors.resizeRow,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onVerticalDragStart: (_) => _dragHeight = widget.height,
+                  onVerticalDragUpdate: (details) {
+                    final start = _dragHeight;
+                    if (start == null) return;
+                    _dragHeight = start + details.delta.dy;
+                    ref
+                        .read(rowResizeProvider.notifier)
+                        .update(
+                          row.id.value,
+                          _dragHeight!
+                              .clamp(SheetRow.minHeight, SheetRow.maxHeight)
+                              .toDouble(),
+                        );
+                  },
+                  onVerticalDragEnd: (_) async {
+                    final height = _dragHeight;
+                    _dragHeight = null;
+                    if (height != null) {
+                      await ref
+                          .read(workbookServiceProvider)
+                          .resizeRow(row, height);
+                    }
+                    ref.read(rowResizeProvider.notifier).end();
+                  },
+                  onDoubleTap: () =>
+                      ref.read(workbookServiceProvider).resizeRow(row, null),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

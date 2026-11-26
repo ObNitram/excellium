@@ -3,8 +3,16 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
 import '../../shared/providers.dart';
+
+import 'package:excellium_core/excellium_core.dart';
+
+import '../calendar/calendar_view.dart';
 import '../editing/edit_bar.dart';
 import '../grid/sheet_grid.dart';
+import '../kanban/kanban_board.dart';
+import '../styling/style_bar.dart';
+import '../views/view_bar.dart';
+import '../views/view_providers.dart';
 import 'sheet_tabs.dart';
 import 'workbook_providers.dart';
 
@@ -36,7 +44,9 @@ class _WorkbookScreenState extends ConsumerState<WorkbookScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const _TitleBar(),
+          const StyleBar(),
           const EditBar(),
+          if (active != null) ViewBar(key: ValueKey(active.id), sheet: active),
           Expanded(
             child: sheets.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -45,13 +55,32 @@ class _WorkbookScreenState extends ConsumerState<WorkbookScreen> {
               ),
               data: (_) => active == null
                   ? const SizedBox.shrink()
-                  : SheetGrid(key: ValueKey(active.id), sheet: active),
+                  : _SheetBody(key: ValueKey(active.id), sheet: active),
             ),
           ),
           const SheetTabs(),
         ],
       ),
     );
+  }
+}
+
+/// Le contenu de la feuille, selon l'affichage choisi dans la vue.
+class _SheetBody extends ConsumerWidget {
+  const _SheetBody({super.key, required this.sheet});
+
+  final Sheet sheet;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final kind = ref.watch(
+      viewSpecProvider(sheet.id).select((spec) => spec.layout.kind),
+    );
+    return switch (kind) {
+      LayoutKind.grid => SheetGrid(sheet: sheet),
+      LayoutKind.kanban => KanbanBoard(sheet: sheet),
+      LayoutKind.calendar => CalendarView(sheet: sheet),
+    };
   }
 }
 

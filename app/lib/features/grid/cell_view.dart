@@ -5,25 +5,34 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/theme.dart';
 import '../../shared/providers.dart';
 import 'cell_format.dart';
-import 'column_type_ui.dart';
 import 'grid_providers.dart';
 
-/// Une cellule de la grille, rendue selon le type de sa colonne.
+/// Une cellule de la grille, rendue selon le type et le style de sa colonne.
 class CellView extends ConsumerWidget {
   const CellView({
     super.key,
     required this.row,
     required this.column,
+    required this.width,
+    required this.height,
     required this.selected,
+    required this.inSelectedColumn,
   });
 
   final SheetRow row;
   final ColumnDef column;
+  final double width;
+  final double height;
+
+  /// Vrai quand cette cellule est la cellule sélectionnée.
   final bool selected;
+
+  /// Vrai quand toute la colonne est sélectionnée.
+  final bool inSelectedColumn;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final value = row[column.id];
+    final style = resolveStyle(column, row);
     return Semantics(
       label: 'Cellule ${column.letter}${row.position + 1}',
       selected: selected,
@@ -31,11 +40,11 @@ class CellView extends ConsumerWidget {
         onTap: () =>
             ref.read(selectionProvider.notifier).select(row.id, column.id),
         child: Container(
-          width: column.width,
-          height: AppSizes.rowHeight,
+          width: width,
+          height: height,
           padding: const EdgeInsets.symmetric(horizontal: 7),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: inSelectedColumn ? AppColors.columnTint : AppColors.surface,
             border: selected
                 ? Border.all(color: AppColors.accent, width: 2)
                 : const Border(
@@ -43,74 +52,161 @@ class CellView extends ConsumerWidget {
                     bottom: BorderSide(color: AppColors.gridLine),
                   ),
           ),
-          alignment: column.type.alignsRight
-              ? Alignment.centerRight
-              : Alignment.centerLeft,
-          child: _content(ref, value),
+          alignment: switch (style.align) {
+            TextAlignment.left => Alignment.centerLeft,
+            TextAlignment.center => Alignment.center,
+            TextAlignment.right => Alignment.centerRight,
+          },
+          child: _content(ref, style),
         ),
       ),
     );
   }
 
-  Widget _content(WidgetRef ref, CellValue? value) {
+  TextStyle _textStyle(ResolvedStyle style, {Color color = AppColors.text}) =>
+      TextStyle(
+        fontSize: 13,
+        color: color,
+        fontWeight: style.bold ? FontWeight.w600 : FontWeight.w400,
+        fontStyle: style.italic ? FontStyle.italic : FontStyle.normal,
+        decoration: style.underline ? TextDecoration.underline : null,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      );
+
+  Widget _text(
+    String text,
+    ResolvedStyle style, {
+    Color color = AppColors.text,
+  }) => Text(
+    text,
+    maxLines: 1,
+    overflow: TextOverflow.ellipsis,
+    style: _textStyle(style, color: color),
+  );
+
+  Widget _content(WidgetRef ref, ResolvedStyle style) {
+    final value = row[column.id];
     switch (column.type) {
       case ColumnType.boolean:
-        final checked = value is BoolValue && value.value;
-        return Center(
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: Checkbox(
-              value: checked,
-              activeColor: AppColors.accent,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              onChanged: (next) {
-                ref.read(selectionProvider.notifier).select(row.id, column.id);
-                ref
-                    .read(workbookServiceProvider)
-                    .setValue(row, column, BoolValue(next ?? false));
-              },
-            ),
-          ),
-        );
+        return _boolean(ref, style, value is BoolValue && value.value);
+
+      case ColumnType.percent:
+        if (value is NumberValue &&
+            style.percentDisplay == PercentDisplay.bar) {
+          return Row(
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: (value.number / 100).clamp(0, 1).toDouble(),
+                    minHeight: 8,
+                    backgroundColor: AppColors.headerLine,
+                    color: AppColors.accent,
+                    semanticsLabel: formatCell(value, column.type),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                formatCell(value, column.type),
+                style: _textStyle(
+                  style,
+                  color: AppColors.textSubtle,
+                ).copyWith(fontSize: 11),
+              ),
+            ],
+          );
+        }
+        return _text(formatCell(value, column.type), style);
 
       case ColumnType.singleCategory:
       case ColumnType.multiCategory:
         if (value is! CategoryValue) return const SizedBox.shrink();
-        return ClipRect(
-          child: Row(
-            children: [
-              for (final category in value.categories)
-                Padding(
-                  padding: const EdgeInsets.only(right: 3),
-                  child: _Chip(category),
-                ),
-            ],
-          ),
-        );
+        return _chips(value.categories);
+
+      case ColumnType.reference:
+        if (value is! ReferenceValue) return const SizedBox.shrink();
+        final target = column.reference?.targetSheetId;
+        final labels = target == null
+            ? const <RowId, String>{}
+            : ref.watch(rowLabelsProvider(target));
+        final ids = column.reference?.cardinality == Cardinality.many
+            ? value.rowIds
+            : value.rowIds.take(1);
+        return _chips([for (final id in ids) labels[id] ?? 'Ligne supprimée']);
 
       case ColumnType.text:
       case ColumnType.number:
-      case ColumnType.percent:
       case ColumnType.date:
       case ColumnType.duration:
-      case ColumnType.reference:
-        return Text(
-          formatCell(value, column.type),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            fontSize: 13,
-            color: AppColors.text,
-            fontFeatures: [FontFeature.tabularFigures()],
+        return _text(formatCell(value, column.type), style);
+    }
+  }
+
+  /// Les pastilles qui dépassent la largeur de la cellule sont coupées, sans
+  /// erreur de mise en page.
+  Widget _chips(Iterable<String> labels) => SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    physics: const NeverScrollableScrollPhysics(),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final label in labels)
+          Padding(
+            padding: const EdgeInsets.only(right: 3),
+            child: CategoryChip(label),
+          ),
+      ],
+    ),
+  );
+
+  Widget _boolean(WidgetRef ref, ResolvedStyle style, bool checked) {
+    void toggle(bool next) {
+      ref.read(selectionProvider.notifier).select(row.id, column.id);
+      ref.read(workbookServiceProvider).setValue(row, column, BoolValue(next));
+    }
+
+    switch (style.boolDisplay) {
+      case BoolDisplay.checkbox:
+        return SizedBox(
+          width: 18,
+          height: 18,
+          child: Checkbox(
+            value: checked,
+            activeColor: AppColors.accent,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            onChanged: (next) => toggle(next ?? false),
+          ),
+        );
+      case BoolDisplay.toggle:
+        return SizedBox(
+          height: 20,
+          child: FittedBox(
+            child: Switch(
+              value: checked,
+              activeTrackColor: AppColors.accent,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              onChanged: toggle,
+            ),
+          ),
+        );
+      case BoolDisplay.text:
+        return InkWell(
+          onTap: () => toggle(!checked),
+          child: _text(
+            checked ? 'Vrai' : 'Faux',
+            style,
+            color: checked ? AppColors.text : AppColors.textMuted,
           ),
         );
     }
   }
 }
 
-class _Chip extends StatelessWidget {
-  const _Chip(this.label);
+/// Pastille d'une catégorie ou d'une ligne référencée.
+class CategoryChip extends StatelessWidget {
+  const CategoryChip(this.label, {super.key});
 
   final String label;
 

@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'support.dart' show editReference;
+
 /// L'interface est testée sur le stockage en mémoire : aucun écran ne dépend
 /// de SQLite.
 void main() {
@@ -41,7 +43,10 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Finder cell(String reference) => find.bySemanticsLabel('Cellule $reference');
+  /// Une cellule par sa référence. Son libellé d'accessibilité commence par
+  /// « Cellule B2 », suivi de son contenu quand elle n'est pas vide.
+  Finder cell(String reference) =>
+      find.bySemanticsLabel(RegExp('^Cellule $reference(\\n|\$)'));
 
   testWidgets('affiche les onglets, les en-têtes et les numéros de ligne', (
     tester,
@@ -67,7 +72,7 @@ void main() {
 
     await tester.tap(cell('B2'));
     await tester.pumpAndSettle();
-    expect(find.text('B2'), findsOneWidget);
+    expect(editReference('B2'), findsOneWidget);
 
     await tester.enterText(find.byType(TextField), 'Import CSV');
     await tester.testTextInput.receiveAction(TextInputAction.done);
@@ -90,7 +95,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // La sélection est descendue en A2 et le champ a gardé le focus.
-    expect(find.text('A2'), findsOneWidget);
+    expect(editReference('A2'), findsOneWidget);
     final field = tester.widget<TextField>(find.byType(TextField));
     expect(field.focusNode?.hasFocus, isTrue);
     expect(field.controller?.text, '');
@@ -115,7 +120,7 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
 
-    expect(find.text('A4'), findsOneWidget);
+    expect(editReference('A4'), findsOneWidget);
     await reload();
     expect(rows[3][columns[0].id], const TextValue('fin'));
   });
@@ -135,7 +140,7 @@ void main() {
 
     expect(find.text('Saisissez un nombre, par exemple 12,5.'), findsOneWidget);
     // La sélection reste sur la cellule à corriger.
-    expect(find.text('A1'), findsOneWidget);
+    expect(editReference('A1'), findsOneWidget);
     await reload();
     expect(rows[0].isEmpty, isTrue);
   });
@@ -158,6 +163,13 @@ void main() {
     await pumpApp(tester);
 
     await tester.tap(find.byTooltip('Options de la colonne A'));
+    await tester.pumpAndSettle();
+    // Le choix du type est une section repliée du menu.
+    expect(find.text('Booléen'), findsNothing);
+    await tester.tap(find.text('Type : Texte'));
+    await tester.pumpAndSettle();
+    // La liste des types est longue : on la fait défiler dans le panneau.
+    await tester.ensureVisible(find.text('Booléen'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Booléen'));
     await tester.pumpAndSettle();
@@ -196,7 +208,9 @@ void main() {
 
     await reload();
     expect(columns[1].name, 'Budget');
-    expect(find.text('Budget'), findsOneWidget);
+    // Le nom apparaît dans l'en-tête, et dans les barres puisque le premier
+    // clic a sélectionné la colonne.
+    expect(find.text('Budget'), findsWidgets);
   });
 
   testWidgets('ajouter une feuille l\'ouvre dans un nouvel onglet', (
