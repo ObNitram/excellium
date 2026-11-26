@@ -89,12 +89,21 @@ String? encodeCellStyle(CellStyle style) => style.isEmpty
         if (style.align != null) 'align': style.align!.name,
         if (style.boolDisplay != null) 'bool': style.boolDisplay!.name,
         if (style.percentDisplay != null) 'percent': style.percentDisplay!.name,
+        if (style.font != null) 'font': style.font!.name,
+        if (style.fontSize != null) 'size': style.fontSize,
+        if (style.textColor != null) 'color': style.textColor,
+        if (style.fillColor != null) 'fill': style.fillColor,
+        if (style.border != null) 'border': style.border!.name,
+        if (style.wrap != null) 'wrap': style.wrap,
+        if (style.numberFormat != null) 'number': style.numberFormat!.name,
+        if (style.decimals != null) 'decimals': style.decimals,
       });
 
 CellStyle decodeCellStyle(String? source) {
   final map = _decodeMap(source);
   if (map == null) return CellStyle.none;
   bool? flag(String key) => map[key] is bool ? map[key]! as bool : null;
+  int? whole(String key) => map[key] is int ? map[key]! as int : null;
   return CellStyle(
     bold: flag('bold'),
     italic: flag('italic'),
@@ -102,6 +111,14 @@ CellStyle decodeCellStyle(String? source) {
     align: TextAlignment.values.asNameMap()[map['align']],
     boolDisplay: BoolDisplay.values.asNameMap()[map['bool']],
     percentDisplay: PercentDisplay.values.asNameMap()[map['percent']],
+    font: CellFont.values.asNameMap()[map['font']],
+    fontSize: whole('size'),
+    textColor: whole('color'),
+    fillColor: whole('fill'),
+    border: CellBorder.values.asNameMap()[map['border']],
+    wrap: flag('wrap'),
+    numberFormat: NumberDisplay.values.asNameMap()[map['number']],
+    decimals: whole('decimals'),
   );
 }
 

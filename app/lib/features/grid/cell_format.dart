@@ -2,14 +2,22 @@ import 'package:excellium_core/excellium_core.dart';
 
 /// Texte affiché dans la grille pour une valeur de cellule.
 ///
-/// C'est de la présentation : la valeur stockée ne change pas.
-String formatCell(CellValue? value, ColumnType type) => switch (value) {
+/// C'est de la présentation : la valeur stockée ne change pas. Un nombre
+/// peut avoir un nombre fixe de [decimals] et le symbole € ([currency]).
+String formatCell(
+  CellValue? value,
+  ColumnType type, {
+  int? decimals,
+  bool currency = false,
+}) => switch (value) {
   null => '',
   TextValue(:final text) => text,
-  NumberValue(:final number) =>
-    type == ColumnType.percent
-        ? '${_groupThousands(number)} %'
-        : _groupThousands(number),
+  NumberValue(:final number) => formatAmount(
+    number,
+    percent: type == ColumnType.percent,
+    decimals: decimals,
+    currency: currency,
+  ),
   DateValue() => cellInputText(value),
   DurationValue(:final duration) => _formatDuration(duration),
   CategoryValue(:final categories) => categories.join(', '),
@@ -25,9 +33,25 @@ String _formatDuration(Duration duration) {
   return '$hours h ${minutes.toString().padLeft(2, '0')}';
 }
 
+/// Un nombre tel qu'affiché : milliers séparés, [decimals] décimales
+/// (sinon sans zéros inutiles), suivi de « % » ou de « € ».
+String formatAmount(
+  double number, {
+  bool percent = false,
+  int? decimals,
+  bool currency = false,
+}) {
+  final text = _groupThousands(number, decimals);
+  if (percent) return '$text %';
+  if (currency) return '$text €';
+  return text;
+}
+
 /// « 1234567,5 » devient « 1 234 567,5 ».
-String _groupThousands(double number) {
-  final plain = formatNumber(number.abs());
+String _groupThousands(double number, [int? places]) {
+  final plain = places == null
+      ? formatNumber(number.abs())
+      : number.abs().toStringAsFixed(places).replaceAll('.', ',');
   final parts = plain.split(',');
   final digits = parts.first;
   final buffer = StringBuffer();

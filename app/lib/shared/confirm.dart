@@ -2,7 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../app/theme.dart';
 
-/// Demande confirmation avant une suppression définitive. Renvoie `true` si
+/// Demande confirmation avant une suppression. Renvoie `true` si
 /// l'utilisateur confirme.
 Future<bool> confirmDelete(
   BuildContext context, {

@@ -29,8 +29,8 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # Police de la maquette, embarquée : l'application ne dépend pas des
-  # polices installées. Licence dans assets/fonts/inter/OFL.txt.
+  # Polices embarquées : l'application ne dépend pas des polices installées.
+  # Licences à côté des fichiers, dans assets/fonts/.
   fonts:
     - family: Inter
       fonts:
@@ -50,5 +50,31 @@ flutter:
         - asset: assets/fonts/inter/Inter-Bold.otf
           weight: 700
         - asset: assets/fonts/inter/Inter-BoldItalic.otf
+          weight: 700
+          style: italic
+    # Polices proposées pour le texte des cellules, avec Inter.
+    - family: Liberation Serif
+      fonts:
+        - asset: assets/fonts/liberation-serif/LiberationSerif-Regular.ttf
+        - asset: assets/fonts/liberation-serif/LiberationSerif-Italic.ttf
+          style: italic
+        - asset: assets/fonts/liberation-serif/LiberationSerif-Bold.ttf
+          weight: 600
+        - asset: assets/fonts/liberation-serif/LiberationSerif-BoldItalic.ttf
+          weight: 600
+          style: italic
+    - family: JetBrains Mono
+      fonts:
+        - asset: assets/fonts/jetbrains-mono/JetBrainsMono-Regular.ttf
+        - asset: assets/fonts/jetbrains-mono/JetBrainsMono-Italic.ttf
+          style: italic
+        - asset: assets/fonts/jetbrains-mono/JetBrainsMono-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/jetbrains-mono/JetBrainsMono-SemiBoldItalic.ttf
+          weight: 600
+          style: italic
+        - asset: assets/fonts/jetbrains-mono/JetBrainsMono-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/jetbrains-mono/JetBrainsMono-BoldItalic.ttf
           weight: 700
           style: italic

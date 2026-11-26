@@ -19,4 +19,5 @@ export 'src/model/style.dart';
 export 'src/model/view.dart';
 export 'src/ports/formula.dart';
 export 'src/ports/store.dart';
+export 'src/usecases/undo_history.dart';
 export 'src/usecases/workbook_service.dart';

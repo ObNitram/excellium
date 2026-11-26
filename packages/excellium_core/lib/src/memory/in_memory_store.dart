@@ -62,28 +62,50 @@ final class InMemoryStore implements ExcelliumStore {
     controller.onCancel = subscription.cancel;
   });
 
+  /// Les modèles sont immuables : copier les tables suffit.
+  _MemorySnapshot _copy() => _MemorySnapshot(
+    Map.of(_sheets),
+    Map.of(_columns),
+    Map.of(_rows),
+    Map.of(_views),
+  );
+
+  void _put(_MemorySnapshot snapshot) {
+    _sheets
+      ..clear()
+      ..addAll(snapshot.sheets);
+    _columns
+      ..clear()
+      ..addAll(snapshot.columns);
+    _rows
+      ..clear()
+      ..addAll(snapshot.rows);
+    _views
+      ..clear()
+      ..addAll(snapshot.views);
+  }
+
+  @override
+  Future<WorkbookSnapshot> snapshot() async => _copy();
+
+  @override
+  Future<void> restore(WorkbookSnapshot snapshot) async {
+    if (snapshot is! _MemorySnapshot) {
+      throw ArgumentError('Instantané pris par un autre stockage.');
+    }
+    _put(snapshot);
+    _notify();
+  }
+
   @override
   Future<T> transaction<T>(Future<T> Function() action) async {
-    final snapshot = _transactionDepth == 0
-        ? (Map.of(_sheets), Map.of(_columns), Map.of(_rows), Map.of(_views))
-        : null;
+    final before = _transactionDepth == 0 ? _copy() : null;
     _transactionDepth++;
     try {
       return await action();
     } catch (_) {
-      if (snapshot != null) {
-        _sheets
-          ..clear()
-          ..addAll(snapshot.$1);
-        _columns
-          ..clear()
-          ..addAll(snapshot.$2);
-        _rows
-          ..clear()
-          ..addAll(snapshot.$3);
-        _views
-          ..clear()
-          ..addAll(snapshot.$4);
+      if (before != null) {
+        _put(before);
         _dirty = false;
       }
       rethrow;
@@ -354,4 +376,13 @@ final class _Views implements ViewRepository {
     }
     _store._notify();
   }
+}
+
+final class _MemorySnapshot implements WorkbookSnapshot {
+  _MemorySnapshot(this.sheets, this.columns, this.rows, this.views);
+
+  final Map<SheetId, Sheet> sheets;
+  final Map<ColumnId, ColumnDef> columns;
+  final Map<RowId, SheetRow> rows;
+  final Map<ViewId, SavedView> views;
 }

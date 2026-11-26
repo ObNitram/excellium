@@ -162,21 +162,29 @@ class Workbook {
 
 bool _fontsLoaded = false;
 
-/// Charge la police Inter de l'application. Sans elle, les tests utilisent
+/// Charge les polices de l'application. Sans elle, les tests utilisent
 /// une police dont chaque caractère est un carré, bien plus large : les
 /// mesures (hauteur des barres, débordements) ne seraient pas celles de
 /// l'application.
 Future<void> loadAppFonts() async {
   if (_fontsLoaded) return;
   _fontsLoaded = true;
-  final loader = FontLoader('Inter');
-  for (final file in Directory('assets/fonts/inter').listSync()) {
-    if (file is File && file.path.endsWith('.otf')) {
-      final bytes = file.readAsBytesSync();
-      loader.addFont(Future.value(ByteData.sublistView(bytes)));
+  const families = {
+    'inter': 'Inter',
+    'liberation-serif': 'Liberation Serif',
+    'jetbrains-mono': 'JetBrains Mono',
+  };
+  for (final MapEntry(key: folder, value: family) in families.entries) {
+    final loader = FontLoader(family);
+    for (final file in Directory('assets/fonts/$folder').listSync()) {
+      if (file is File &&
+          (file.path.endsWith('.otf') || file.path.endsWith('.ttf'))) {
+        final bytes = file.readAsBytesSync();
+        loader.addFont(Future.value(ByteData.sublistView(bytes)));
+      }
     }
+    await loader.load();
   }
-  await loader.load();
 }
 
 /// Lance l'application sur [store], dans une fenêtre de bureau.

@@ -8,13 +8,65 @@ import '../model/sheet.dart';
 import '../model/style.dart';
 import '../model/view.dart';
 import '../ports/store.dart';
+import 'undo_history.dart';
 
 /// Cas d'usage du classeur : les règles qui enchaînent plusieurs opérations
 /// de stockage. L'interface n'appelle jamais les dépôts pour ces actions.
 final class WorkbookService {
-  const WorkbookService(this._store);
+  WorkbookService(ExcelliumStore store, {UndoHistory? history})
+    : _store = store,
+      history = history ?? UndoHistory(store);
 
   final ExcelliumStore _store;
+
+  /// Les modifications faites par ce service, pour annuler et rétablir.
+  final UndoHistory history;
+
+  /// Profondeur des modifications en cours : une action qui en appelle une
+  /// autre n'est enregistrée qu'une fois.
+  int _depth = 0;
+
+  /// Exécute [action] après avoir gardé l'état du classeur dans
+  /// l'historique. [mergeKey] fusionne les saisies au fil de la frappe ;
+  /// [changed] dit, d'après le résultat, si quelque chose a changé.
+  Future<T> _change<T>(
+    Future<T> Function() action, {
+    Object? mergeKey,
+    bool Function(T result)? changed,
+  }) async {
+    if (_depth > 0) return action();
+    _depth++;
+    var recorded = false;
+    try {
+      recorded = await history.record(mergeKey: mergeKey);
+      final result = await action();
+      if (recorded && changed != null && !changed(result)) {
+        history.discardLast();
+      }
+      return result;
+    } catch (_) {
+      if (recorded) history.discardLast();
+      rethrow;
+    } finally {
+      _depth--;
+    }
+  }
+
+  /// Exécute [action] sans l'enregistrer dans l'historique.
+  Future<T> _quiet<T>(Future<T> Function() action) async {
+    _depth++;
+    try {
+      return await action();
+    } finally {
+      _depth--;
+    }
+  }
+
+  /// Annule la dernière modification. Faux s'il n'y en a pas.
+  Future<bool> undo() => history.undo();
+
+  /// Rétablit la dernière modification annulée. Faux s'il n'y en a pas.
+  Future<bool> redo() => history.redo();
 
   static const int defaultColumnCount = 6;
   static const int defaultRowCount = 20;
@@ -22,7 +74,8 @@ final class WorkbookService {
   /// Crée une première feuille si le classeur est vide.
   Future<void> ensureDefaultSheet() async {
     final sheets = await _store.sheets.getSheets();
-    if (sheets.isEmpty) await createSheet();
+    // Le classeur de départ ne s'annule pas.
+    if (sheets.isEmpty) await _quiet(createSheet);
   }
 
   /// Crée une feuille avec des colonnes Texte et des lignes vides.
@@ -33,7 +86,7 @@ final class WorkbookService {
     String? name,
     int columnCount = defaultColumnCount,
     int rowCount = defaultRowCount,
-  }) {
+  }) => _change(() async {
     return _store.transaction(() async {
       final existing = await _store.sheets.getSheets();
       final sheet = await _store.sheets.createSheet(
@@ -49,21 +102,33 @@ final class WorkbookService {
       }
       return sheet;
     });
-  }
+  });
+
+  /// Ajoute une ligne vide à la fin de la feuille.
+  Future<SheetRow> addRow(SheetId sheetId) =>
+      _change(() => _store.rows.addRow(sheetId));
+
+  /// Ajoute une colonne Texte à la fin de la feuille.
+  Future<ColumnDef> addColumn(SheetId sheetId) =>
+      _change(() => _store.columns.addColumn(sheetId));
+
+  /// Supprime une vue enregistrée.
+  Future<void> deleteView(ViewId id) =>
+      _change(() => _store.views.deleteView(id));
 
   /// Renomme une feuille. Un nom vide est refusé : le nom ne change pas.
-  Future<void> renameSheet(Sheet sheet, String name) async {
+  Future<void> renameSheet(Sheet sheet, String name) => _change(() async {
     final trimmed = name.trim();
     if (trimmed.isEmpty || trimmed == sheet.name) return;
     await _store.sheets.renameSheet(sheet.id, trimmed);
-  }
+  });
 
   /// Supprime une feuille avec tout son contenu.
   ///
   /// Les colonnes Référence des autres feuilles qui la visaient perdent leur
   /// feuille liée et leurs valeurs. Renvoie `false`, sans rien changer, si
   /// c'est la dernière feuille du classeur : il en reste toujours une.
-  Future<bool> deleteSheet(SheetId id) {
+  Future<bool> deleteSheet(SheetId id) => _change(() async {
     return _store.transaction(() async {
       final sheets = await _store.sheets.getSheets();
       if (sheets.length <= 1 || !sheets.any((sheet) => sheet.id == id)) {
@@ -96,14 +161,14 @@ final class WorkbookService {
       await _store.sheets.deleteSheet(id);
       return true;
     });
-  }
+  }, changed: (done) => done);
 
   /// Supprime une colonne et ses cellules.
   ///
   /// Les vues enregistrées de la feuille et les recherches des colonnes
   /// Référence qui la citaient sont mises à jour. Renvoie `false`, sans rien
   /// changer, si c'est la dernière colonne de la feuille.
-  Future<bool> deleteColumn(ColumnDef column) {
+  Future<bool> deleteColumn(ColumnDef column) => _change(() async {
     return _store.transaction(() async {
       final columns = await _store.columns.getColumns(column.sheetId);
       if (columns.length <= 1 || !columns.any((c) => c.id == column.id)) {
@@ -138,10 +203,10 @@ final class WorkbookService {
       await _store.columns.deleteColumn(column.id);
       return true;
     });
-  }
+  }, changed: (done) => done);
 
   /// Supprime une ligne, et la retire des cellules Référence qui la visaient.
-  Future<void> deleteRow(SheetRow row) {
+  Future<void> deleteRow(SheetRow row) => _change(() async {
     return _store.transaction(() async {
       for (final sheet in await _store.sheets.getSheets()) {
         final linked = [
@@ -169,7 +234,7 @@ final class WorkbookService {
       }
       await _store.rows.deleteRow(row.id);
     });
-  }
+  });
 
   /// Crée une ligne avec [values] : la première ligne entièrement vide de la
   /// feuille est réutilisée, sinon une ligne est ajoutée à la fin.
@@ -179,7 +244,7 @@ final class WorkbookService {
   Future<SheetRow> addRowWith(
     SheetId sheetId,
     Map<ColumnId, CellValue> values,
-  ) {
+  ) => _change(() async {
     return _store.transaction(() async {
       final columns = {
         for (final column in await _store.columns.getColumns(sheetId))
@@ -210,81 +275,88 @@ final class WorkbookService {
       return (await _store.rows.getRows(sheetId))
           .firstWhere((row) => row.id == target!.id);
     });
-  }
+  });
 
   /// Ajoute une catégorie à une colonne, sans l'affecter à une cellule : une
   /// nouvelle étape de kanban, par exemple. Renvoie `false` si le nom est
   /// vide ou déjà défini.
-  Future<bool> addCategory(ColumnDef column, String name) async {
+  Future<bool> addCategory(ColumnDef column, String name) => _change(() async {
     final trimmed = name.trim();
     if (trimmed.isEmpty || column.options.contains(trimmed)) return false;
     await _store.columns.updateColumn(
       column.copyWith(options: [...column.options, trimmed]),
     );
     return true;
-  }
+  }, changed: (done) => done);
 
   /// Déplace une feuille du rang [from] au rang [to].
-  Future<void> moveSheet(int from, int to) async {
+  Future<void> moveSheet(int from, int to) => _change(() async {
     final sheets = await _store.sheets.getSheets();
     final ids = _moved([for (final sheet in sheets) sheet.id], from, to);
     if (ids != null) await _store.sheets.reorderSheets(ids);
-  }
+  });
 
   /// Déplace une colonne du rang [from] au rang [to].
-  Future<void> moveColumn(SheetId sheetId, int from, int to) async {
-    final columns = await _store.columns.getColumns(sheetId);
-    final ids = _moved([for (final column in columns) column.id], from, to);
-    if (ids != null) await _store.columns.reorderColumns(sheetId, ids);
-  }
+  Future<void> moveColumn(SheetId sheetId, int from, int to) =>
+      _change(() async {
+        final columns = await _store.columns.getColumns(sheetId);
+        final ids = _moved([for (final column in columns) column.id], from, to);
+        if (ids != null) await _store.columns.reorderColumns(sheetId, ids);
+      });
 
   /// Renomme une colonne ; un nom vide rétablit la lettre.
-  Future<void> renameColumn(ColumnDef column, String name) =>
-      _store.columns.updateColumn(column.copyWith(name: name.trim()));
+  Future<void> renameColumn(ColumnDef column, String name) => _change(
+    () => _store.columns.updateColumn(column.copyWith(name: name.trim())),
+  );
 
   /// Règle la largeur d'une colonne, bornée aux limites autorisées.
-  Future<void> resizeColumn(ColumnDef column, double width) =>
-      _store.columns.updateColumn(
-        column.copyWith(
-          width: width.clamp(ColumnDef.minWidth, ColumnDef.maxWidth).toDouble(),
-        ),
-      );
+  Future<void> resizeColumn(ColumnDef column, double width) => _change(
+    () => _store.columns.updateColumn(
+      column.copyWith(
+        width: width.clamp(ColumnDef.minWidth, ColumnDef.maxWidth).toDouble(),
+      ),
+    ),
+  );
 
   /// Règle la hauteur d'une ligne, bornée ; `null` rétablit la hauteur par
   /// défaut.
-  Future<void> resizeRow(SheetRow row, double? height) =>
-      _store.rows.setRowHeight(
-        row.id,
-        height?.clamp(SheetRow.minHeight, SheetRow.maxHeight).toDouble(),
-      );
+  Future<void> resizeRow(SheetRow row, double? height) => _change(
+    () => _store.rows.setRowHeight(
+      row.id,
+      height?.clamp(SheetRow.minHeight, SheetRow.maxHeight).toDouble(),
+    ),
+  );
 
   /// Applique [patch] au style de toute la colonne.
   ///
   /// Les cellules qui avaient un réglage individuel pour ces propriétés le
   /// perdent : c'est le réglage de la colonne qui s'applique partout.
-  Future<void> styleColumn(ColumnDef column, CellStyle patch) {
-    return _store.transaction(() async {
-      await _store.columns.updateColumn(
-        column.copyWith(style: column.style.merge(patch)),
-      );
-      final rows = await _store.rows.getRows(column.sheetId);
-      for (final row in rows) {
-        final own = row.styles[column.id];
-        if (own == null) continue;
-        final cleaned = own.without(patch);
-        if (cleaned != own) {
-          await _store.rows.setCellStyle(row.id, column.id, cleaned);
-        }
-      }
-    });
-  }
+  Future<void> styleColumn(ColumnDef column, CellStyle patch) =>
+      _change(() async {
+        return _store.transaction(() async {
+          await _store.columns.updateColumn(
+            column.copyWith(style: column.style.merge(patch)),
+          );
+          final rows = await _store.rows.getRows(column.sheetId);
+          for (final row in rows) {
+            final own = row.styles[column.id];
+            if (own == null) continue;
+            final cleaned = own.without(patch);
+            if (cleaned != own) {
+              await _store.rows.setCellStyle(row.id, column.id, cleaned);
+            }
+          }
+        });
+      });
 
   /// Applique [patch] au style d'une seule cellule.
   Future<void> styleCell(SheetRow row, ColumnDef column, CellStyle patch) =>
-      _store.rows.setCellStyle(
-        row.id,
-        column.id,
-        (row.styles[column.id] ?? CellStyle.none).merge(patch),
+      _change(
+        () => _store.rows.setCellStyle(
+          row.id,
+          column.id,
+          (row.styles[column.id] ?? CellStyle.none).merge(patch),
+        ),
       );
 
   /// Choisit ou retire une catégorie dans une cellule, et l'ajoute aux
@@ -293,7 +365,7 @@ final class WorkbookService {
     SheetRow row,
     ColumnDef column,
     String category,
-  ) {
+  ) => _change(() async {
     final name = category.trim();
     if (name.isEmpty) return Future.value();
     return _store.transaction(() async {
@@ -312,88 +384,99 @@ final class WorkbookService {
         ),
       );
     });
-  }
+  });
 
   /// Fixe l'ordre des catégories d'une colonne (l'ordre des étapes d'un
   /// kanban). Les catégories seulement présentes dans les cellules sont
   /// enregistrées au passage.
   Future<void> reorderCategories(ColumnDef column, List<String> ordered) =>
-      _store.columns.updateColumn(column.copyWith(options: ordered));
+      _change(
+        () => _store.columns.updateColumn(column.copyWith(options: ordered)),
+      );
 
   /// Règle la feuille visée, la cardinalité et les colonnes de recherche d'une
   /// colonne Référence.
   Future<void> configureReference(ColumnDef column, ReferenceConfig config) =>
-      _store.columns.updateColumn(column.copyWith(reference: config));
+      _change(
+        () => _store.columns.updateColumn(column.copyWith(reference: config)),
+      );
 
   /// Fixe la formule d'une colonne Formule.
-  Future<void> setFormula(ColumnDef column, String formula) =>
-      _store.columns.updateColumn(column.copyWith(formula: formula));
+  Future<void> setFormula(ColumnDef column, String formula) => _change(
+    () => _store.columns.updateColumn(column.copyWith(formula: formula)),
+    mergeKey: ('formula', column.id),
+  );
 
   /// Fixe le contenu de la case de [column] sur les lignes de regroupement.
-  Future<void> setGroupCalc(ColumnDef column, String content) =>
-      _store.columns.updateColumn(column.copyWith(groupCalc: content));
+  Future<void> setGroupCalc(ColumnDef column, String content) => _change(
+    () => _store.columns.updateColumn(column.copyWith(groupCalc: content)),
+    mergeKey: ('group', column.id),
+  );
 
   /// Fixe le contenu d'une case de calcul sous [column], à la ligne [index]
   /// (à partir de 0). Un contenu vide retire la case.
-  Future<void> setCalcCell(ColumnDef column, int index, String content) {
-    final cells = Map<int, String>.of(column.calcCells);
-    if (content.trim().isEmpty) {
-      cells.remove(index);
-    } else {
-      cells[index] = content;
-    }
-    return _store.columns.updateColumn(column.copyWith(calcCells: cells));
-  }
+  Future<void> setCalcCell(ColumnDef column, int index, String content) =>
+      _change(() async {
+        final cells = Map<int, String>.of(column.calcCells);
+        if (content.trim().isEmpty) {
+          cells.remove(index);
+        } else {
+          cells[index] = content;
+        }
+        return _store.columns.updateColumn(column.copyWith(calcCells: cells));
+      }, mergeKey: ('calc', column.id, index));
 
   /// Enregistre une vue. Sans [name], elle s'appelle « Vue N ».
-  Future<SavedView> saveView(SheetId sheetId, ViewSpec spec, {String? name}) {
-    return _store.transaction(() async {
-      final existing = await _store.views.getViews(sheetId);
-      final names = {for (final view in existing) view.name};
-      var label = name?.trim() ?? '';
-      if (label.isEmpty) {
-        var n = existing.length + 1;
-        while (names.contains('Vue $n')) {
-          n++;
-        }
-        label = 'Vue $n';
-      }
-      return _store.views.createView(
-        sheetId,
-        name: label,
-        spec: spec.normalized,
-      );
-    });
-  }
+  Future<SavedView> saveView(SheetId sheetId, ViewSpec spec, {String? name}) =>
+      _change(() async {
+        return _store.transaction(() async {
+          final existing = await _store.views.getViews(sheetId);
+          final names = {for (final view in existing) view.name};
+          var label = name?.trim() ?? '';
+          if (label.isEmpty) {
+            var n = existing.length + 1;
+            while (names.contains('Vue $n')) {
+              n++;
+            }
+            label = 'Vue $n';
+          }
+          return _store.views.createView(
+            sheetId,
+            name: label,
+            spec: spec.normalized,
+          );
+        });
+      });
 
   /// Change le type d'une colonne et convertit les valeurs existantes.
   ///
   /// Une valeur qui n'a pas de sens dans le nouveau type est effacée. Le tout
   /// est atomique : la colonne n'est jamais dans un type avec des valeurs d'un
   /// autre.
-  Future<void> changeColumnType(ColumnDef column, ColumnType type) {
-    if (column.type == type) return Future.value();
-    return _store.transaction(() async {
-      await _store.columns.updateColumn(
-        column.copyWith(
-          type: type,
-          reference: type == ColumnType.reference
-              ? (column.reference ?? const ReferenceConfig())
-              : null,
-          clearReference: type != ColumnType.reference,
-        ),
-      );
-      final rows = await _store.rows.getRows(column.sheetId);
-      for (final row in rows) {
-        final before = row[column.id];
-        if (before == null) continue;
-        final after = convertCellValue(before, type);
-        if (after != before) {
-          await _store.rows.setCell(row.id, column.id, after);
-        }
-      }
-    });
-  }
+  Future<void> changeColumnType(ColumnDef column, ColumnType type) =>
+      _change(() async {
+        if (column.type == type) return Future.value();
+        return _store.transaction(() async {
+          await _store.columns.updateColumn(
+            column.copyWith(
+              type: type,
+              reference: type == ColumnType.reference
+                  ? (column.reference ?? const ReferenceConfig())
+                  : null,
+              clearReference: type != ColumnType.reference,
+            ),
+          );
+          final rows = await _store.rows.getRows(column.sheetId);
+          for (final row in rows) {
+            final before = row[column.id];
+            if (before == null) continue;
+            final after = convertCellValue(before, type);
+            if (after != before) {
+              await _store.rows.setCell(row.id, column.id, after);
+            }
+          }
+        });
+      });
 
   /// Enregistre un texte saisi dans une cellule, selon le type de la colonne.
   ///
@@ -409,15 +492,21 @@ final class WorkbookService {
       case CellInputRejected(:final error):
         return error;
       case CellInputOk(:final value):
+        // Valider sans rien changer n'est pas une modification : rien à
+        // annuler.
         if (value != row[column.id]) {
-          await _store.rows.setCell(row.id, column.id, value);
+          await _change(() => _store.rows.setCell(row.id, column.id, value));
         }
         return null;
     }
   }
 
   /// Écrit directement une valeur typée (case à cocher, sélecteur de date…).
-  Future<void> setValue(SheetRow row, ColumnDef column, CellValue? value) {
+  Future<void> setValue(
+    SheetRow row,
+    ColumnDef column,
+    CellValue? value,
+  ) async {
     if (value != null && !value.fits(column.type)) {
       throw ArgumentError.value(
         value,
@@ -425,7 +514,8 @@ final class WorkbookService {
         'incompatible avec une colonne ${column.type.name}',
       );
     }
-    return _store.rows.setCell(row.id, column.id, value);
+    if (value == row[column.id]) return;
+    await _change(() => _store.rows.setCell(row.id, column.id, value));
   }
 
   static String _nextSheetName(List<Sheet> existing) {

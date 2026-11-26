@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/theme.dart';
 import '../../shared/app_icons.dart';
 import '../../shared/providers.dart';
+import '../../shared/workbook_fields.dart';
 import '../formulas/formula_text.dart';
 import '../grid/grid_providers.dart';
 
@@ -69,6 +70,9 @@ class _FormulaFieldState extends State<_FormulaField> {
   @override
   void initState() {
     super.initState();
+    // Chaque frappe est enregistrée : Ctrl+Z annule dans le classeur, où
+    // la saisie compte pour une seule modification.
+    WorkbookFields.register(_focus);
     _focus.addListener(_onFocusChanged);
     if (widget.autofocus) _takeFocus();
   }
@@ -104,8 +108,19 @@ class _FormulaFieldState extends State<_FormulaField> {
     // enregistrée arrive avec un temps de retard, et la recopier ici
     // effacerait ce qui vient d'être tapé ou inséré.
     if (old.identity != widget.identity) {
+      _echoes.clear();
       _controller.text = widget.text;
       if (widget.autofocus) _takeFocus();
+    } else if (widget.text != old.text &&
+        widget.text != _controller.text &&
+        !_echoes.contains(widget.text)) {
+      // Le texte enregistré a changé sans venir de ce champ (Ctrl+Z, par
+      // exemple) : le champ le reprend.
+      _echoes.clear();
+      _controller.value = TextEditingValue(
+        text: widget.text,
+        selection: TextSelection.collapsed(offset: widget.text.length),
+      );
     }
     // Un clic sur la case, même déjà sélectionnée, rend la saisie au champ :
     // à la souris, cliquer hors du champ lui retire le focus.
@@ -115,6 +130,7 @@ class _FormulaFieldState extends State<_FormulaField> {
   @override
   void dispose() {
     _controller.dispose();
+    WorkbookFields.unregister(_focus);
     _focus
       ..removeListener(_onFocusChanged)
       ..dispose();
@@ -128,8 +144,18 @@ class _FormulaFieldState extends State<_FormulaField> {
       text: next,
       selection: TextSelection.collapsed(offset: next.length),
     );
-    widget.onChanged(next);
+    _save(next);
     _takeFocus();
+  }
+
+  /// Textes envoyés à l'enregistrement depuis le dernier chargement. Ils
+  /// reviennent avec un temps de retard, parfois dans le désordre : les
+  /// reconnaître évite d'écraser ce qui est en train d'être tapé.
+  final Set<String> _echoes = {};
+
+  void _save(String text) {
+    _echoes.add(text);
+    widget.onChanged(text);
   }
 
   @override
@@ -157,7 +183,7 @@ class _FormulaFieldState extends State<_FormulaField> {
               child: TextField(
                 controller: _controller,
                 focusNode: _focus,
-                onChanged: widget.onChanged,
+                onChanged: _save,
                 autocorrect: false,
                 enableSuggestions: false,
                 textAlignVertical: TextAlignVertical.center,

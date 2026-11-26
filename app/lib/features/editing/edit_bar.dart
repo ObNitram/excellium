@@ -6,6 +6,7 @@ import '../../app/theme.dart';
 import '../../shared/app_icons.dart';
 import '../../shared/controls.dart';
 import '../../shared/providers.dart';
+import '../../shared/workbook_fields.dart';
 import '../../shared/segmented.dart';
 import '../grid/column_type_ui.dart';
 import '../grid/grid_providers.dart';
@@ -29,8 +30,27 @@ class _EditBarState extends ConsumerState<EditBar> {
   final _categoryFocus = FocusNode();
   CellInputError? _error;
 
+  /// Le texte de la cellule tel qu'il a été chargé dans le champ : s'il n'a
+  /// pas changé, aucune saisie n'est en cours.
+  String _loaded = '';
+
+  @override
+  void initState() {
+    super.initState();
+    WorkbookFields.register(
+      _focusNode,
+      pending: () => _controller.text != _loaded,
+    );
+    WorkbookFields.register(
+      _categoryFocus,
+      pending: () => _categoryController.text.isNotEmpty,
+    );
+  }
+
   @override
   void dispose() {
+    WorkbookFields.unregister(_focusNode);
+    WorkbookFields.unregister(_categoryFocus);
     _controller.dispose();
     _categoryController.dispose();
     _focusNode.dispose();
@@ -41,6 +61,7 @@ class _EditBarState extends ConsumerState<EditBar> {
   /// Aligne le champ sur la cellule quand la sélection ou sa valeur change.
   void _sync(SelectedCell? cell) {
     final text = cell == null ? '' : cellInputText(cell.row[cell.column.id]);
+    _loaded = text;
     if (_controller.text != text) _controller.text = text;
     if (_error != null) setState(() => _error = null);
   }

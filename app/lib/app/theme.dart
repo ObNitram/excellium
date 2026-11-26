@@ -47,6 +47,9 @@ abstract final class AppColors {
   /// Bord des champs et des boutons à bordure.
   static const fieldBorder = Color(0xFF7A828E);
   static const danger = Color(0xFFB3261E);
+
+  /// Bouton ou entrée inactifs.
+  static const disabled = Color(0xFFA9AFB8);
 }
 
 /// Dimensions de l'interface.
@@ -102,11 +105,18 @@ abstract final class AppText {
   );
 
   /// Police à chasse fixe des formules.
-  static const mono = TextStyle(
-    fontSize: 12,
-    fontFamily: 'monospace',
-    fontFamilyFallback: ['Menlo', 'Consolas', 'DejaVu Sans Mono'],
-  );
+  static const mono = TextStyle(fontSize: 12, fontFamily: 'JetBrains Mono');
+}
+
+/// Familles de caractères des polices proposées pour les cellules.
+abstract final class AppFonts {
+  static const sans = 'Inter';
+  static const serif = 'Liberation Serif';
+  static const mono = 'JetBrains Mono';
+
+  /// Une taille en points devient des pixels : 10 points font les 13 px du
+  /// texte de la grille.
+  static double pixels(int points) => points * 1.3;
 }
 
 /// Bord d'un champ de saisie ou d'un bouton à bordure.

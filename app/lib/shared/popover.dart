@@ -44,10 +44,38 @@ class _PopoverState extends State<Popover> {
   final _controller = OverlayPortalController();
   final _link = LayerLink();
 
-  void _toggle() => setState(_controller.toggle);
+  final _scope = FocusScopeNode(debugLabel: 'Panneau');
+
+  /// Ce qui avait le focus avant l'ouverture (le champ de la barre
+  /// d'édition, par exemple) : il le retrouve à la fermeture.
+  FocusNode? _previous;
+
+  void _toggle() => _controller.isShowing ? _close() : _open();
+
+  void _open() {
+    _previous = FocusManager.instance.primaryFocus;
+    setState(_controller.show);
+    // Le panneau prend le focus : Échap le ferme même s'il ne contient aucun
+    // champ, et même si l'écran avait déjà le focus.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _controller.isShowing) _scope.requestFocus();
+    });
+  }
 
   void _close() {
-    if (_controller.isShowing) setState(_controller.hide);
+    if (!_controller.isShowing) return;
+    setState(_controller.hide);
+    final previous = _previous;
+    _previous = null;
+    if (previous != null && previous.context != null && _scope.hasFocus) {
+      previous.requestFocus();
+    }
+  }
+
+  @override
+  void dispose() {
+    _scope.dispose();
+    super.dispose();
   }
 
   @override
@@ -96,6 +124,7 @@ class _PopoverState extends State<Popover> {
                     // Le panneau prend le focus à l'ouverture : Échap le ferme
                     // même s'il ne contient aucun champ de saisie.
                     child: FocusScope(
+                      node: _scope,
                       autofocus: true,
                       child: Container(
                         key: const Key('popover-panel'),

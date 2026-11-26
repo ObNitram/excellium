@@ -23,3 +23,48 @@ final formulaEngineProvider = Provider<FormulaEngine>(
 final workbookServiceProvider = Provider<WorkbookService>(
   (ref) => WorkbookService(ref.watch(storeProvider)),
 );
+
+/// Ce qu'on peut annuler ou rétablir, à jour après chaque modification.
+typedef UndoState = ({bool canUndo, bool canRedo});
+
+final undoStateProvider = StreamProvider<UndoState>((ref) async* {
+  final history = ref.watch(workbookServiceProvider).history;
+  UndoState read() => (canUndo: history.canUndo, canRedo: history.canRedo);
+  yield read();
+  await for (final _ in history.changes) {
+    yield read();
+  }
+});
+
+/// Zoom de la feuille affichée, gardé le temps de la session.
+final zoomProvider = NotifierProvider<Zoom, double>(Zoom.new);
+
+class Zoom extends Notifier<double> {
+  /// Niveaux proposés, en fraction de la taille normale.
+  static const levels = [0.5, 0.75, 0.9, 1.0, 1.25, 1.5, 2.0];
+
+  @override
+  double build() => 1;
+
+  void set(double level) => state = level;
+
+  void zoomIn() {
+    for (final level in levels) {
+      if (level > state) {
+        state = level;
+        return;
+      }
+    }
+  }
+
+  void zoomOut() {
+    for (final level in levels.reversed) {
+      if (level < state) {
+        state = level;
+        return;
+      }
+    }
+  }
+
+  void reset() => state = 1;
+}

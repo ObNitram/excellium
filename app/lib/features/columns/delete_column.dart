@@ -21,13 +21,13 @@ Future<void> deleteColumn(BuildContext context, ColumnDef column) async {
     context,
     title: 'Supprimer la colonne « ${column.label} » ?',
     message: switch (filled) {
-      0 => 'Elle ne contient aucune valeur. Cette action est définitive.',
+      0 => 'Elle ne contient aucune valeur. Ctrl+Z annule la suppression.',
       1 =>
-        'La valeur qu\'elle contient sera perdue. Cette action est '
-            'définitive.',
+        'La valeur qu\'elle contient sera supprimée. Ctrl+Z annule la '
+            'suppression.',
       _ =>
-        'Les $filled valeurs qu\'elle contient seront perdues. Cette '
-            'action est définitive.',
+        'Les $filled valeurs qu\'elle contient seront supprimées. Ctrl+Z '
+            'annule la suppression.',
     },
   );
   if (!confirmed) return;

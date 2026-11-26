@@ -74,6 +74,55 @@ void main() {
       expect(text.percentDisplay, PercentDisplay.value);
     });
 
+    test('police, taille, couleurs, bordure et format par défaut', () {
+      const column = ColumnDef(
+        id: ColumnId('c'),
+        sheetId: SheetId('s'),
+        position: 0,
+        type: ColumnType.number,
+      );
+      final style = resolveStyle(column);
+      expect(style.font, CellFont.sans);
+      expect(style.fontSize, CellStyle.defaultFontSize);
+      expect(style.textColor, isNull);
+      expect(style.fillColor, isNull);
+      expect(style.border, CellBorder.none);
+      expect(style.wrap, isFalse);
+      expect(style.numberFormat, NumberDisplay.automatic);
+      expect(style.decimals, isNull);
+    });
+
+    test('une cellule peut revenir aux couleurs et décimales par défaut', () {
+      const column = ColumnDef(
+        id: ColumnId('c'),
+        sheetId: SheetId('s'),
+        position: 0,
+        type: ColumnType.number,
+        style: CellStyle(
+          textColor: 0xFFB3261E,
+          fillColor: 0xFFFFF4CC,
+          decimals: 2,
+        ),
+      );
+      expect(resolveStyle(column).decimals, 2);
+      final row = SheetRow(
+        id: const RowId('r'),
+        sheetId: const SheetId('s'),
+        position: 0,
+        styles: {
+          const ColumnId('c'): const CellStyle(
+            textColor: 0,
+            fillColor: 0,
+            decimals: -1,
+          ),
+        },
+      );
+      final style = resolveStyle(column, row);
+      expect(style.textColor, isNull);
+      expect(style.fillColor, isNull);
+      expect(style.decimals, isNull);
+    });
+
     test('le style de la cellule complète celui de la colonne', () {
       final column = col(
         'c',

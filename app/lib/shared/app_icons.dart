@@ -122,7 +122,25 @@ abstract final class AppIcons {
     'M10 9.5l3.5 4M13.5 9.5l-3.5 4',
   );
 
+  // Barre de style.
+  static const undo = AppIconData(
+    'M6 3.5L3 6.5l3 3M3 6.5h6.5a3.5 3.5 0 010 7H7',
+  );
+  static const redo = AppIconData(
+    'M10 3.5l3 3-3 3M13 6.5H6.5a3.5 3.5 0 000 7H9',
+  );
+  static const fill = AppIconData(
+    'M8 2c2.4 2.8 3.8 4.9 3.8 6.7a3.8 3.8 0 01-7.6 0C4.2 6.9 5.6 4.8 8 2z',
+  );
+  static const borders = AppIconData('M2.5 2.5h11v11h-11zM8 2.5v11M2.5 8h11');
+  static const wrap = AppIconData(
+    'M3 4h10M3 8h8a2 2 0 010 4H9M3 12h3M10.2 10.8L9 12l1.2 1.2',
+  );
+
   // Absents de la maquette, dessinés dans le même style.
+  static const borderNone = AppIconData('M2.5 2.5h11v11h-11zM3 13L13 3');
+  static const borderBottom = AppIconData('M2.5 13.5h11M2.5 3v7M13.5 3v7');
+  static const borderBox = AppIconData('M2.5 2.5h11v11h-11z');
   static const rename = AppIconData('M10.5 3l2.5 2.5L6 12.5H3.5V10z');
   static const delete = AppIconData(
     'M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5',

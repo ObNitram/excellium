@@ -149,8 +149,7 @@ class _ViewBarState extends ConsumerState<ViewBar> {
                                   iconSize: 12,
                                   size: 28,
                                   onPressed: () => ref
-                                      .read(storeProvider)
-                                      .views
+                                      .read(workbookServiceProvider)
                                       .deleteView(entry.id),
                                 ),
                               ),

@@ -171,7 +171,9 @@ void main() {
       await deleteFromMenu(tester, 'Budget');
       expect(find.text('Supprimer la colonne « Budget » ?'), findsOneWidget);
       expect(
-        find.textContaining('Les 3 valeurs qu\'elle contient seront perdues'),
+        find.textContaining(
+          'Les 3 valeurs qu\'elle contient seront supprimées',
+        ),
         findsOneWidget,
       );
       await confirm(tester);

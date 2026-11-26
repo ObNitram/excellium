@@ -231,6 +231,8 @@ class CalcPane extends Notifier<CalcPaneState> {
 
   void hide() => state = (height: state.height, hidden: true);
 
+  void show() => state = (height: state.height, hidden: false);
+
   void reset() => state = (height: defaultHeight, hidden: false);
 }
 

@@ -50,20 +50,34 @@ class CellView extends ConsumerWidget {
           width: width,
           height: height,
           padding: _padding,
+          clipBehavior: Clip.hardEdge,
           decoration: BoxDecoration(
-            color: inSelectedColumn ? AppColors.columnTint : AppColors.surface,
+            color: inSelectedColumn
+                ? AppColors.columnTint
+                : (style.fillColor == null
+                      ? AppColors.surface
+                      : Color(style.fillColor!)),
             border: const Border(
               right: BorderSide(color: AppColors.gridLine),
               bottom: BorderSide(color: AppColors.gridLine),
             ),
           ),
-          // Le cadre de la cellule sélectionnée est dessiné par-dessus, comme
-          // l'ombre intérieure de la maquette : le texte ne bouge pas.
+          // Le cadre de la cellule sélectionnée et les bordures choisies sont
+          // dessinés par-dessus, comme l'ombre intérieure de la maquette : le
+          // texte ne bouge pas.
           foregroundDecoration: selected
               ? BoxDecoration(
                   border: Border.all(color: AppColors.accent, width: 2),
                 )
-              : null,
+              : switch (style.border) {
+                  CellBorder.none => null,
+                  CellBorder.bottom => const BoxDecoration(
+                    border: Border(bottom: BorderSide(color: AppColors.text)),
+                  ),
+                  CellBorder.box => BoxDecoration(
+                    border: Border.all(color: AppColors.text),
+                  ),
+                },
           alignment: switch (style.align) {
             TextAlignment.left => Alignment.centerLeft,
             TextAlignment.center => Alignment.center,
@@ -83,8 +97,17 @@ class CellView extends ConsumerWidget {
 
   TextStyle _textStyle(ResolvedStyle style, {Color color = AppColors.text}) =>
       TextStyle(
-        fontSize: 13,
-        color: color,
+        fontFamily: switch (style.font) {
+          CellFont.sans => AppFonts.sans,
+          CellFont.serif => AppFonts.serif,
+          CellFont.mono => AppFonts.mono,
+        },
+        fontSize: AppFonts.pixels(style.fontSize),
+        // La couleur choisie l'emporte sur celle qu'impose la valeur (Faux
+        // en gris, erreur en rouge reste rouge).
+        color: style.textColor != null && color != AppColors.danger
+            ? Color(style.textColor!)
+            : color,
         fontWeight: style.bold ? FontWeight.w600 : FontWeight.w400,
         fontStyle: style.italic ? FontStyle.italic : FontStyle.normal,
         decoration: style.underline ? TextDecoration.underline : null,
@@ -97,10 +120,29 @@ class CellView extends ConsumerWidget {
     Color color = AppColors.text,
   }) => Text(
     text,
-    maxLines: 1,
-    overflow: TextOverflow.ellipsis,
+    // Avec le retour à la ligne, le texte occupe toute la hauteur de la
+    // ligne ; ce qui dépasse est coupé.
+    maxLines: style.wrap ? null : 1,
+    softWrap: style.wrap,
+    overflow: style.wrap ? TextOverflow.clip : TextOverflow.ellipsis,
+    textAlign: switch (style.align) {
+      TextAlignment.left => TextAlign.left,
+      TextAlignment.center => TextAlign.center,
+      TextAlignment.right => TextAlign.right,
+    },
     style: _textStyle(style, color: color),
   );
+
+  /// Un nombre de la cellule, avec les décimales et le symbole choisis.
+  String _number(CellValue? value, ColumnType type, ResolvedStyle style) =>
+      formatCell(
+        value,
+        type,
+        decimals: style.decimals,
+        currency:
+            type != ColumnType.percent &&
+            style.numberFormat == NumberDisplay.currency,
+      );
 
   Widget _content(WidgetRef ref, ResolvedStyle style) {
     final value = row[column.id];
@@ -139,7 +181,7 @@ class CellView extends ConsumerWidget {
               ConstrainedBox(
                 constraints: const BoxConstraints(minWidth: 32),
                 child: Text(
-                  formatCell(value, column.type),
+                  _number(value, column.type, style),
                   textAlign: TextAlign.right,
                   style: _textStyle(
                     style,
@@ -150,7 +192,7 @@ class CellView extends ConsumerWidget {
             ],
           );
         }
-        return _text(formatCell(value, column.type), style);
+        return _text(_number(value, column.type, style), style);
 
       case ColumnType.singleCategory:
       case ColumnType.multiCategory:
@@ -181,13 +223,21 @@ class CellView extends ConsumerWidget {
               ? const SizedBox.shrink()
               : _text(formulaErrorMark, style, color: AppColors.danger);
         }
-        final number = values.values[row.id];
-        return number == null
-            ? const SizedBox.shrink()
-            : _text(formulaValueText(number, values.unit), style);
+        // Un résultat numérique suit les décimales et le symbole choisis ;
+        // une date ou une durée garde sa présentation.
+        final cell = formulaAsCell(values.values[row.id], values.unit);
+        if (cell == null) return const SizedBox.shrink();
+        return _text(
+          cell.value is NumberValue
+              ? _number(cell.value, cell.type, style)
+              : formatCell(cell.value, cell.type),
+          style,
+        );
+
+      case ColumnType.number:
+        return _text(_number(value, column.type, style), style);
 
       case ColumnType.text:
-      case ColumnType.number:
       case ColumnType.date:
       case ColumnType.duration:
         return _text(formatCell(value, column.type), style);
@@ -200,28 +250,46 @@ class CellView extends ConsumerWidget {
   Widget _chips(Iterable<String> labels, ResolvedStyle style) => Row(
     children: [
       Expanded(
-        child: ClipRect(
-          child: Align(
-            alignment: switch (style.align) {
-              TextAlignment.left => Alignment.centerLeft,
-              TextAlignment.center => Alignment.center,
-              TextAlignment.right => Alignment.centerRight,
-            },
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              physics: const NeverScrollableScrollPhysics(),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (final (index, label) in labels.indexed) ...[
-                    if (index > 0) const SizedBox(width: 3),
-                    CategoryChip(label),
-                  ],
-                ],
+        // Avec le retour à la ligne, les pastilles passent à la ligne ; ce
+        // qui dépasse la hauteur de la ligne est coupé.
+        child: style.wrap
+            ? ClipRect(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Wrap(
+                    spacing: 3,
+                    runSpacing: 3,
+                    alignment: switch (style.align) {
+                      TextAlignment.left => WrapAlignment.start,
+                      TextAlignment.center => WrapAlignment.center,
+                      TextAlignment.right => WrapAlignment.end,
+                    },
+                    children: [for (final label in labels) CategoryChip(label)],
+                  ),
+                ),
+              )
+            : ClipRect(
+                child: Align(
+                  alignment: switch (style.align) {
+                    TextAlignment.left => Alignment.centerLeft,
+                    TextAlignment.center => Alignment.center,
+                    TextAlignment.right => Alignment.centerRight,
+                  },
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const NeverScrollableScrollPhysics(),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (final (index, label) in labels.indexed) ...[
+                          if (index > 0) const SizedBox(width: 3),
+                          CategoryChip(label),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
-        ),
       ),
       const SizedBox(width: 4),
       const AppIcon(

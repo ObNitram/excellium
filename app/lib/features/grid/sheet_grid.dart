@@ -171,7 +171,7 @@ class _SheetGridState extends ConsumerState<SheetGrid> {
         child: _AddButton(
           tooltip: 'Ajouter une ligne',
           width: AppSizes.rowHeaderWidth,
-          onPressed: () => ref.read(storeProvider).rows.addRow(sheet.id),
+          onPressed: () => ref.read(workbookServiceProvider).addRow(sheet.id),
         ),
       );
     }
@@ -263,8 +263,7 @@ class _SheetGridState extends ConsumerState<SheetGrid> {
                         _AddButton(
                           tooltip: 'Ajouter une colonne',
                           onPressed: () => ref
-                              .read(storeProvider)
-                              .columns
+                              .read(workbookServiceProvider)
                               .addColumn(sheet.id),
                         ),
                       ],
@@ -339,22 +338,7 @@ class _RowNumberState extends ConsumerState<_RowNumber> {
   double? _dragHeight;
 
   /// Supprime la ligne ; une confirmation est demandée si elle a du contenu.
-  Future<void> _delete() async {
-    final row = widget.row;
-    final service = ref.read(workbookServiceProvider);
-    if (!row.isEmpty) {
-      final filled = row.cells.length;
-      final confirmed = await confirmDelete(
-        context,
-        title: 'Supprimer la ligne ${row.position + 1} ?',
-        message:
-            '${filled > 1 ? 'Ses $filled valeurs seront perdues' : 'Sa valeur sera perdue'}'
-            '. Cette action est définitive.',
-      );
-      if (!confirmed) return;
-    }
-    await service.deleteRow(row);
-  }
+  Future<void> _delete() => deleteRow(context, ref, widget.row);
 
   @override
   Widget build(BuildContext context) {
@@ -495,4 +479,25 @@ class _AddButton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Supprime [row], après confirmation si elle contient des valeurs.
+Future<void> deleteRow(
+  BuildContext context,
+  WidgetRef ref,
+  SheetRow row,
+) async {
+  final service = ref.read(workbookServiceProvider);
+  if (!row.isEmpty) {
+    final filled = row.cells.length;
+    final confirmed = await confirmDelete(
+      context,
+      title: 'Supprimer la ligne ${row.position + 1} ?',
+      message:
+          '${filled > 1 ? 'Ses $filled valeurs seront supprimées' : 'Sa valeur sera supprimée'}'
+          '. Ctrl+Z annule la suppression.',
+    );
+    if (!confirmed) return;
+  }
+  await service.deleteRow(row);
 }

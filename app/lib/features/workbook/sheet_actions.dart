@@ -44,7 +44,7 @@ Future<void> deleteSheet(
 
   final message = StringBuffer(
     'Ses colonnes, ses lignes et ses vues enregistrées seront supprimées. '
-    'Cette action est définitive.',
+    'Ctrl+Z annule la suppression.',
   );
   if (linked.isNotEmpty) {
     message.write(

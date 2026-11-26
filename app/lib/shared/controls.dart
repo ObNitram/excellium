@@ -40,13 +40,16 @@ class IconBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lit = on ?? false;
-    final fg = lit ? AppColors.accent : color;
+    final fg = onPressed == null
+        ? AppColors.disabled
+        : (lit ? AppColors.accent : color);
     return Tooltip(
       message: tooltip,
       child: Semantics(
         button: true,
         toggled: on,
         label: tooltip,
+        enabled: onPressed != null,
         excludeSemantics: true,
         child: Material(
           color: lit

@@ -266,6 +266,26 @@ void runStoreContractTests(
         expect(saved.options, ['À faire', 'Terminé']);
       });
 
+      test('toutes les propriétés du style sont relues', () async {
+        const style = CellStyle(
+          font: CellFont.serif,
+          fontSize: 14,
+          textColor: 0xFFB3261E,
+          fillColor: 0xFFFFF4CC,
+          border: CellBorder.box,
+          wrap: true,
+          numberFormat: NumberDisplay.currency,
+          decimals: 2,
+        );
+        await store.rows.setCellStyle(row.id, column.id, style);
+        await store.columns.updateColumn(column.copyWith(style: style));
+
+        expect((await store.rows.getRows(sheet.id)).single.styles, {
+          column.id: style,
+        });
+        expect((await store.columns.getColumns(sheet.id)).single.style, style);
+      });
+
       test('le style d\'une cellule est relu, même si elle est vide', () async {
         const style = CellStyle(underline: true, align: TextAlignment.right);
         await store.rows.setCellStyle(row.id, column.id, style);
@@ -614,6 +634,89 @@ void runStoreContractTests(
 
         final sheets = await store.sheets.getSheets();
         expect(sheets.map((s) => s.name), ['Avant']);
+      });
+    });
+
+    group('instantané', () {
+      test('restaurer remet tout le classeur à l\'identique', () async {
+        final sheet = await store.sheets.createSheet(name: 'Tâches');
+        final other = await store.sheets.createSheet(name: 'Équipe');
+        final column = await store.columns.addColumn(
+          sheet.id,
+          name: 'Titre',
+          type: ColumnType.text,
+        );
+        await store.columns.updateColumn(
+          column.copyWith(style: const CellStyle(bold: true), formula: 'x'),
+        );
+        final row = await store.rows.addRow(sheet.id);
+        await store.rows.setCell(row.id, column.id, const TextValue('A'));
+        await store.rows.setCellStyle(
+          row.id,
+          column.id,
+          const CellStyle(fillColor: 0xFFFFF4CC),
+        );
+        await store.rows.setRowHeight(row.id, 40);
+        final view = await store.views.createView(
+          sheet.id,
+          name: 'Vue',
+          spec: ViewSpec(hiddenColumnIds: {column.id}),
+        );
+
+        Future<Object> read() async => [
+          await store.sheets.getSheets(),
+          for (final s in await store.sheets.getSheets()) ...[
+            await store.columns.getColumns(s.id),
+            await store.rows.getRows(s.id),
+            await store.views.getViews(s.id),
+          ],
+        ].toString();
+        final before = await read();
+        final snapshot = await store.snapshot();
+
+        // Tout change : contenu, styles, ajouts, suppressions.
+        await store.rows.setCell(row.id, column.id, const TextValue('B'));
+        await store.rows.setCellStyle(row.id, column.id, null);
+        await store.rows.addRow(sheet.id);
+        await store.columns.addColumn(sheet.id, name: 'Neuve');
+        await store.views.deleteView(view.id);
+        await store.sheets.deleteSheet(other.id);
+        expect(await read(), isNot(before));
+
+        await store.restore(snapshot);
+        expect(await read(), before);
+        final restored = (await store.rows.getRows(sheet.id)).single;
+        expect(restored.id, row.id);
+        expect(restored.cells, {column.id: const TextValue('A')});
+      });
+
+      test('les flux ouverts voient la restauration', () async {
+        final sheet = await store.sheets.createSheet(name: 'A');
+        final snapshot = await store.snapshot();
+        await store.sheets.renameSheet(sheet.id, 'B');
+
+        final names = store.sheets.watchSheets().map(
+          (sheets) => sheets.map((s) => s.name).join(),
+        );
+        final seen = <String>[];
+        final subscription = names.listen(seen.add);
+        await pumpEventQueue();
+        await store.restore(snapshot);
+        await pumpEventQueue();
+        await subscription.cancel();
+
+        expect(seen.first, 'B');
+        expect(seen.last, 'A');
+      });
+
+      test('un instantané se restaure plusieurs fois', () async {
+        final sheet = await store.sheets.createSheet(name: 'A');
+        final snapshot = await store.snapshot();
+        for (final name in ['B', 'C']) {
+          await store.sheets.renameSheet(sheet.id, name);
+          await store.restore(snapshot);
+          expect((await store.sheets.getSheets()).single.name, 'A');
+        }
       });
     });
   });

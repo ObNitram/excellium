@@ -100,6 +100,13 @@ abstract interface class ViewRepository {
   Future<void> deleteView(ViewId id);
 }
 
+/// Copie de tout le contenu d'un classeur, prise par [ExcelliumStore.snapshot]
+/// pour pouvoir annuler une modification.
+///
+/// Son contenu est propre à chaque moteur de stockage : seul celui qui l'a
+/// prise sait la restaurer.
+abstract interface class WorkbookSnapshot {}
+
 /// Point d'entrée d'un moteur de stockage.
 abstract interface class ExcelliumStore {
   SheetRepository get sheets;
@@ -112,6 +119,15 @@ abstract interface class ExcelliumStore {
 
   /// Exécute [action] de façon atomique : tout est enregistré, ou rien.
   Future<T> transaction<T>(Future<T> Function() action);
+
+  /// Copie tout le classeur : feuilles, colonnes, lignes, cellules, styles
+  /// et vues enregistrées.
+  Future<WorkbookSnapshot> snapshot();
+
+  /// Remet le classeur exactement dans l'état de [snapshot], identifiants
+  /// compris, et prévient les flux ouverts. [snapshot] doit venir de ce même
+  /// stockage.
+  Future<void> restore(WorkbookSnapshot snapshot);
 
   Future<void> close();
 }

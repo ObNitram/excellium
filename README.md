@@ -36,7 +36,9 @@ du cœur, jamais l'inverse.
   `FormulaEngine`, la seule chose connue du moteur de formules.
 - `usecases/` : `WorkbookService`, pour les actions qui enchaînent plusieurs
   écritures ou portent une règle (créer une feuille, changer le type d'une
-  colonne, styler une colonne, déplacer, enregistrer une vue…).
+  colonne, styler une colonne, déplacer, enregistrer une vue…). Toute
+  modification du classeur passe par lui ; il la note dans son `UndoHistory`
+  (voir « Annuler et rétablir »).
 - `memory.dart` : un stockage en mémoire, utilisé par les tests de l'interface.
 
 ### L'application (`app`)
@@ -69,15 +71,18 @@ L'interface reprend la maquette Claude Design (`Main.dc.html`) : mêmes
 couleurs, tailles et espacements. Ils sont rassemblés dans
 `app/lib/app/theme.dart` (`AppColors`, `AppSizes`, `AppShadows`, `AppText`).
 
-- **Police** : Inter, embarquée dans `app/assets/fonts/inter/` avec sa licence
-  (SIL Open Font License), en chiffres à chasse fixe comme dans la maquette.
-  Les tests de l'interface la chargent aussi, pour mesurer la même mise en page
-  que l'application.
+- **Polices** : Inter pour l'interface, en chiffres à chasse fixe comme dans
+  la maquette. Les cellules peuvent aussi utiliser Liberation Serif ou
+  JetBrains Mono (aussi celle des formules). Toutes sont embarquées dans
+  `app/assets/fonts/`, chacune avec sa licence (SIL Open Font License pour
+  Inter et Liberation Serif, Apache 2.0 pour JetBrains Mono). Les tests de
+  l'interface les chargent aussi, pour mesurer la même mise en page que
+  l'application.
 - **Pictogrammes** : les tracés SVG de la maquette, dessinés par `AppIcon`
   (`shared/app_icons.dart`) ; aucune icône Material n'est utilisée.
-- Les boutons de la maquette qui n'ont pas encore de fonction (menus Fichier,
-  Édition…, annuler, zoom, police, couleurs, bordures, fusion) ne sont pas
-  affichés.
+- Le seul bouton de la maquette absent est « Fusionner les cellules » : dans
+  un tableur aux colonnes typées, deux cellules de colonnes différentes n'ont
+  pas de valeur commune possible.
 
 Les écrans lisent l'état par des providers Riverpod écrits à la main (sans
 génération de code) et agissent en appelant `WorkbookService`, ou les dépôts à
@@ -216,11 +221,35 @@ Régénérer le code Drift après une modification du schéma
 cd packages/excellium_storage_drift && dart run build_runner build
 ```
 
+## Annuler et rétablir
+
+Avant chaque modification, `WorkbookService` demande à son `UndoHistory`
+(`excellium_core`) de garder un instantané du classeur ; annuler remet le
+dernier instantané en place, rétablir refait ce qui a été annulé. Les
+instantanés viennent du stockage (`ExcelliumStore.snapshot` et `restore`) :
+chaque moteur copie et réécrit ses propres données, identifiants compris, ce
+qui rend l'annulation exacte quelle que soit l'action (suppression d'une
+feuille, changement de type, style…).
+
+- Une action composée (créer une feuille avec ses colonnes et ses lignes)
+  s'annule d'un coup.
+- Une formule ou une case de calcul tapée lettre par lettre s'annule d'un
+  coup : les enregistrements de même clé, à moins de deux secondes
+  d'intervalle, sont fusionnés.
+- Valider une cellule sans la changer, ou une suppression refusée, ne crée pas
+  d'étape.
+- L'historique garde les 100 dernières modifications, le temps de la session.
+- La vue en cours (tri, filtres, regroupement, colonnes masquées) n'en fait
+  pas partie : c'est un réglage d'affichage.
+
+Dans l'application : boutons de la barre de style, menu Édition, Ctrl+Z et
+Ctrl+Y (ou Ctrl+Maj+Z). Dans un champ où une saisie est en cours, Ctrl+Z
+annule la frappe ; sinon il annule la dernière modification du classeur.
+
 ## Suppressions
 
-Les suppressions sont définitives (il n'y a pas encore d'annulation) : une
-confirmation annonce ce qui sera perdu. Elles passent par `WorkbookService`,
-qui garde le classeur cohérent :
+Une confirmation annonce ce qui sera supprimé ; Ctrl+Z annule la suppression.
+Elles passent par `WorkbookService`, qui garde le classeur cohérent :
 
 - supprimer une feuille vide les colonnes Référence qui la visaient ;
 - supprimer une colonne la retire des vues enregistrées et des recherches des
@@ -245,10 +274,17 @@ Fait :
   glisser-déposer, suppression (menu de la colonne), hauteur des lignes
   réglable, suppression d'une ligne (clic sur son numéro) ;
 - sélection d'une cellule ou d'une colonne entière (clic sur l'en-tête) ;
-- barre de style, limitée aux réglages qui ont un sens pour le type : gras,
-  italique, souligné, alignement, booléen en case à cocher, interrupteur ou
-  texte, pourcentage en valeur ou en barre de progression ; par colonne ou par
-  cellule ;
+- barre de titre avec les menus Fichier, Édition, Affichage, Insertion,
+  Format et Données ;
+- annuler et rétablir (boutons, menu, Ctrl+Z / Ctrl+Y) ;
+- zoom de la feuille de 50 à 200 % (menu, Ctrl++ / Ctrl+- / Ctrl+0) ;
+- barre de style, limitée aux réglages qui ont un sens pour le type : police
+  (Inter, Liberation Serif, JetBrains Mono) et taille, gras, italique,
+  souligné, couleur du texte, couleur de fond, bordure, alignement, retour à
+  la ligne, format des nombres (décimales, €, pourcentage), booléen en case à
+  cocher, interrupteur ou texte, pourcentage en valeur ou en barre de
+  progression ; par colonne ou par cellule ;
+- Σ écrit sous la colonne une case de calcul (somme, moyenne…) ;
 - barre d'édition adaptée au type : texte, nombre, pourcentage, date, durée,
   catégories en pastilles, Vrai / Faux, recherche d'une ligne dans la feuille
   liée (avec choix des colonnes de recherche et relation 1 – n ou n – n) ;
@@ -273,10 +309,10 @@ Fait :
 Pas encore fait :
 
 - créer une ligne depuis le calendrier ;
-- menus de la barre de titre (Fichier, Édition…), annuler / rétablir,
-  copier-coller, sélection de plusieurs cellules, navigation au clavier dans la
-  grille ;
-- styles de police, de couleur et de bordure, formats de nombre ;
+- copier-coller, sélection de plusieurs cellules, navigation au clavier dans la
+  grille, fusion de cellules ;
+- la hauteur d'une ligne ne s'adapte pas à une grande police ou au retour à
+  la ligne : on la règle à la main ;
 - formules : pas de texte, de condition (`Si`) ni de référence d'une case de
   calcul à une autre ; la hauteur du volet de calcul et les groupes repliés ne
   sont pas mémorisés d'une session à l'autre ;

@@ -34,7 +34,63 @@ final class DriftStore implements ExcelliumStore {
       _db.transaction(action);
 
   @override
+  Future<WorkbookSnapshot> snapshot() => _db.transaction(
+    () async => _DriftSnapshot(
+      sheets: await _db.select(_db.sheetRecords).get(),
+      columns: await _db.select(_db.columnRecords).get(),
+      rows: await _db.select(_db.rowRecords).get(),
+      cells: await _db.select(_db.cellRecords).get(),
+      styles: await _db.select(_db.cellStyleRecords).get(),
+      views: await _db.select(_db.viewRecords).get(),
+    ),
+  );
+
+  @override
+  Future<void> restore(WorkbookSnapshot snapshot) {
+    if (snapshot is! _DriftSnapshot) {
+      throw ArgumentError('Instantané pris par un autre stockage.');
+    }
+    // Les enregistrements bruts sont réécrits tels quels : identifiants,
+    // rangs et contenus codés reviennent à l'identique.
+    return _db.transaction(() async {
+      await _db.delete(_db.cellStyleRecords).go();
+      await _db.delete(_db.cellRecords).go();
+      await _db.delete(_db.viewRecords).go();
+      await _db.delete(_db.rowRecords).go();
+      await _db.delete(_db.columnRecords).go();
+      await _db.delete(_db.sheetRecords).go();
+      await _db.batch((batch) {
+        batch
+          ..insertAll(_db.sheetRecords, snapshot.sheets)
+          ..insertAll(_db.columnRecords, snapshot.columns)
+          ..insertAll(_db.rowRecords, snapshot.rows)
+          ..insertAll(_db.cellRecords, snapshot.cells)
+          ..insertAll(_db.cellStyleRecords, snapshot.styles)
+          ..insertAll(_db.viewRecords, snapshot.views);
+      });
+    });
+  }
+
+  @override
   Future<void> close() => _db.close();
+}
+
+final class _DriftSnapshot implements WorkbookSnapshot {
+  _DriftSnapshot({
+    required this.sheets,
+    required this.columns,
+    required this.rows,
+    required this.cells,
+    required this.styles,
+    required this.views,
+  });
+
+  final List<SheetRecord> sheets;
+  final List<ColumnRecord> columns;
+  final List<RowRecord> rows;
+  final List<CellRecord> cells;
+  final List<CellStyleRecord> styles;
+  final List<ViewRecord> views;
 }
 
 final class _Sheets implements SheetRepository {
