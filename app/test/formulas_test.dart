@@ -183,7 +183,10 @@ void main() {
 
       await typeInBar(tester, 'Budget * 2');
       expect(find.text('#ERREUR'), findsNothing);
-      expect(find.text('Calculée pour chaque ligne'), findsOneWidget);
+      expect(
+        find.text('Calculée pour chaque ligne de la colonne'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('une cellule calculée montre la formule et ne se vide pas', (
@@ -502,7 +505,7 @@ void main() {
         tester.getTopLeft(find.text('Maquette')).dy,
         inExclusiveRange(tops[1], tops[2]),
       );
-      expect(find.byIcon(Icons.table_rows_outlined), findsWidgets);
+      expect(find.bySemanticsLabel('Colonne de regroupement'), findsWidgets);
     });
 
     testWidgets('« Aucun regroupement » rend la grille complète', (

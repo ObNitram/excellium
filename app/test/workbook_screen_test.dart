@@ -1,4 +1,5 @@
 import 'package:excellium_app/app/excellium_app.dart';
+import 'package:excellium_app/shared/controls.dart';
 import 'package:excellium_app/shared/providers.dart';
 import 'package:excellium_core/excellium_core.dart';
 import 'package:excellium_core/memory.dart';
@@ -182,7 +183,7 @@ void main() {
 
     await reload();
     expect(columns[0].type, ColumnType.boolean);
-    expect(find.byType(Checkbox), findsNWidgets(rows.length));
+    expect(find.byType(AppCheckbox), findsNWidgets(rows.length));
   });
 
   testWidgets('cocher une case enregistre un booléen', (tester) async {
@@ -190,7 +191,7 @@ void main() {
         .changeColumnType(columns[0], ColumnType.boolean);
     await pumpApp(tester);
 
-    await tester.tap(find.byType(Checkbox).first);
+    await tester.tap(find.byType(AppCheckbox).first);
     await tester.pumpAndSettle();
 
     await reload();

@@ -82,7 +82,7 @@ void main() {
 
       await openColumnMenu(tester, 'Tâche');
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'Contient'),
+        find.widgetWithText(TextFormField, 'Contient…'),
         'client',
       );
       await tester.pumpAndSettle();
@@ -97,7 +97,7 @@ void main() {
 
       await openColumnMenu(tester, 'Budget');
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'Minimum'),
+        find.byKey(const Key('filter-field-Minimum')),
         '800',
       );
       await tester.pumpAndSettle();
@@ -112,7 +112,7 @@ void main() {
     ) async {
       await openTasks(tester);
       await openColumnMenu(tester, 'Budget');
-      await tester.tap(find.widgetWithText(TextFormField, 'Minimum'));
+      await tester.tap(find.byKey(const Key('filter-field-Minimum')));
       await tester.pumpAndSettle();
 
       // Saisie caractère par caractère, comme au clavier : le filtre devient
@@ -134,7 +134,7 @@ void main() {
       await openTasks(tester);
       await openColumnMenu(tester, 'Budget');
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'Minimum'),
+        find.byKey(const Key('filter-field-Minimum')),
         '800',
       );
       await tester.pumpAndSettle();

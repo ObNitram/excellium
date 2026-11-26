@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
+import '../../shared/app_icons.dart';
+import '../../shared/controls.dart';
 import '../../shared/drag_data.dart';
 import '../../shared/popover.dart';
 import '../../shared/providers.dart';
@@ -32,11 +34,13 @@ class SheetTabs extends ConsumerWidget {
 
     return Container(
       height: AppSizes.tabsHeight,
-      decoration: const BoxDecoration(
-        color: AppColors.header,
+      color: AppColors.header,
+      // Le trait du haut est dessiné par-dessus, comme l'ombre intérieure de
+      // la maquette : les onglets gardent toute la hauteur.
+      foregroundDecoration: const BoxDecoration(
         border: Border(top: BorderSide(color: AppColors.headerLine)),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 6),
+      padding: const EdgeInsets.only(left: 6, right: 12),
       child: Row(
         children: [
           Flexible(
@@ -61,10 +65,11 @@ class SheetTabs extends ConsumerWidget {
               ),
             ),
           ),
-          IconButton(
+          const SizedBox(width: 8),
+          IconBtn(
             tooltip: 'Ajouter une feuille',
-            icon: const Icon(Icons.add, size: 18),
-            color: AppColors.textSubtle,
+            icon: AppIcons.plus,
+            size: 36,
             onPressed: () async {
               final created = await service.createSheet();
               ref.read(chosenSheetIdProvider.notifier).choose(created.id);
@@ -122,7 +127,7 @@ class _SheetTabState extends ConsumerState<_SheetTab> {
     Widget label({required bool floating}) => Container(
       height: AppSizes.tabsHeight,
       alignment: Alignment.center,
-      padding: EdgeInsets.only(left: 18, right: selected && !floating ? 4 : 18),
+      padding: EdgeInsets.only(left: 18, right: selected && !floating ? 0 : 18),
       child: Text(
         sheet.name,
         style: TextStyle(
@@ -133,10 +138,12 @@ class _SheetTabState extends ConsumerState<_SheetTab> {
       ),
     );
 
+    // L'onglet actif est blanc, souligné de 2 px et bordé à gauche et à
+    // droite ; ces traits sont dessinés par-dessus, sans décaler le texte.
     return Container(
       height: AppSizes.tabsHeight,
-      decoration: BoxDecoration(
-        color: selected ? AppColors.surface : null,
+      color: selected ? AppColors.surface : null,
+      foregroundDecoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(
             width: 2,
@@ -182,10 +189,17 @@ class _SheetTabState extends ConsumerState<_SheetTab> {
                 message: 'Options de la feuille ${sheet.name}',
                 child: InkWell(
                   onTap: toggle,
-                  child: SizedBox(
-                    width: 24,
+                  hoverColor: Colors.transparent,
+                  child: Container(
+                    width: 32,
                     height: AppSizes.tabsHeight,
-                    child: Icon(Icons.arrow_drop_down, size: 18, color: color),
+                    alignment: Alignment.centerLeft,
+                    padding: const EdgeInsets.only(left: 8),
+                    child: AppIcon(
+                      AppIcons.chevronDown,
+                      size: 10,
+                      color: color,
+                    ),
                   ),
                 ),
               ),
@@ -194,7 +208,7 @@ class _SheetTabState extends ConsumerState<_SheetTab> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   PanelItem(
-                    icon: Icons.edit_outlined,
+                    icon: AppIcons.rename,
                     label: 'Renommer',
                     onTap: () {
                       close();
@@ -202,7 +216,7 @@ class _SheetTabState extends ConsumerState<_SheetTab> {
                     },
                   ),
                   PanelItem(
-                    icon: Icons.delete_outline,
+                    icon: AppIcons.delete,
                     label: 'Supprimer la feuille',
                     danger: true,
                     onTap: widget.deletable
@@ -226,7 +240,6 @@ class _SheetTabState extends ConsumerState<_SheetTab> {
                 ],
               ),
             ),
-          if (selected) const SizedBox(width: 6),
         ],
       ),
     );

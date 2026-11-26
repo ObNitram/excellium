@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
+import '../../shared/app_icons.dart';
 import '../../shared/popover.dart';
+import '../../shared/segmented.dart';
 import '../../shared/providers.dart';
 import '../grid/column_type_ui.dart';
 import '../grid/grid_providers.dart';
@@ -55,13 +57,13 @@ class _ColumnMenuState extends ConsumerState<ColumnMenu> {
       children: [
         const PanelTitle('Trier'),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
           child: Row(
             children: [
               Expanded(
                 child: _SortButton(
                   label: 'Croissant',
-                  icon: Icons.arrow_upward,
+                  icon: AppIcons.sortAscending,
                   selected: sortedHere && sort!.ascending,
                   onTap: () => view.toggleSort(column.id, ascending: true),
                 ),
@@ -70,7 +72,7 @@ class _ColumnMenuState extends ConsumerState<ColumnMenu> {
               Expanded(
                 child: _SortButton(
                   label: 'Décroissant',
-                  icon: Icons.arrow_downward,
+                  icon: AppIcons.sortDescending,
                   selected: sortedHere && !sort!.ascending,
                   onTap: () => view.toggleSort(column.id, ascending: false),
                 ),
@@ -95,19 +97,22 @@ class _ColumnMenuState extends ConsumerState<ColumnMenu> {
         // le focus, dès le premier caractère saisi.
         KeyedSubtree(
           key: ValueKey('filter-${column.id.value}-$_filterReset'),
-          child: ColumnFilterEditor(column: column),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+            child: ColumnFilterEditor(column: column),
+          ),
         ),
-        const Divider(height: 12),
-        PanelItem(
-          icon: Icons.edit_outlined,
+        const PanelDivider(),
+        _Action(
+          icon: AppIcons.rename,
           label: 'Renommer',
           onTap: () {
             widget.close();
             renameColumn(context, ref, column);
           },
         ),
-        PanelItem(
-          icon: Icons.visibility_off_outlined,
+        _Action(
+          icon: AppIcons.hide,
           label: 'Masquer la colonne',
           onTap: () {
             view.setHidden(column.id, hidden: true);
@@ -116,17 +121,17 @@ class _ColumnMenuState extends ConsumerState<ColumnMenu> {
         ),
         if (canGroupBy(column.type))
           spec.groupBy == column.id
-              ? PanelItem(
-                  icon: Icons.table_rows_outlined,
+              ? _Action(
+                  icon: AppIcons.group,
                   label: 'Ne plus regrouper',
-                  selected: true,
+                  on: true,
                   onTap: () {
                     view.setGroupBy(null);
                     widget.close();
                   },
                 )
-              : PanelItem(
-                  icon: Icons.table_rows_outlined,
+              : _Action(
+                  icon: AppIcons.group,
                   label: 'Regrouper par cette colonne',
                   onTap: () {
                     view.setGroupBy(column.id);
@@ -134,8 +139,8 @@ class _ColumnMenuState extends ConsumerState<ColumnMenu> {
                   },
                 ),
         if (column.type == ColumnType.singleCategory)
-          PanelItem(
-            icon: Icons.view_kanban_outlined,
+          _Action(
+            icon: AppIcons.kanban,
             label: 'Utiliser comme vue Kanban',
             onTap: () {
               view.setLayout(ViewLayout.kanban(column.id));
@@ -143,22 +148,24 @@ class _ColumnMenuState extends ConsumerState<ColumnMenu> {
             },
           ),
         if (column.type == ColumnType.date)
-          PanelItem(
-            icon: Icons.calendar_month_outlined,
+          _Action(
+            icon: AppIcons.calendar,
             label: 'Utiliser comme vue Calendrier',
             onTap: () {
               view.setLayout(ViewLayout.calendar(column.id));
               widget.close();
             },
           ),
-        const Divider(height: 12),
-        PanelItem(
+        const PanelDivider(),
+        _Action(
           icon: column.type.icon,
-          label: 'Type : ${column.type.label}',
-          trailing: Icon(
-            _typeOpen ? Icons.expand_less : Icons.expand_more,
-            size: 16,
-            color: AppColors.textMuted,
+          labelPrefix: 'Type : ',
+          label: column.type.label,
+          trailing: AppIcon(
+            AppIcons.chevronDown,
+            size: 10,
+            color: AppColors.text,
+            turns: _typeOpen ? 2 : 0,
           ),
           onTap: () => setState(() => _typeOpen = !_typeOpen),
         ),
@@ -168,6 +175,15 @@ class _ColumnMenuState extends ConsumerState<ColumnMenu> {
               icon: type.icon,
               label: type.label,
               selected: type == column.type,
+              trailing: type == column.type
+                  ? null
+                  : Text(
+                      type.hint,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
               onTap: () async {
                 final selection = ref.read(selectionProvider.notifier);
                 await service.changeColumnType(column, type);
@@ -184,9 +200,9 @@ class _ColumnMenuState extends ConsumerState<ColumnMenu> {
           if (column.type == ColumnType.reference)
             ReferenceConfigEditor(column: column),
         ],
-        const Divider(height: 12),
-        PanelItem(
-          icon: Icons.delete_outline,
+        const PanelDivider(),
+        _Action(
+          icon: AppIcons.delete,
           label: 'Supprimer la colonne',
           danger: true,
           // Il reste toujours au moins une colonne dans la feuille.
@@ -211,7 +227,7 @@ class _SortButton extends StatelessWidget {
   });
 
   final String label;
-  final IconData icon;
+  final AppIconData icon;
   final bool selected;
   final VoidCallback onTap;
 
@@ -221,22 +237,16 @@ class _SortButton extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      child: InkWell(
+      child: _Bordered(
+        selected: selected,
         onTap: onTap,
-        borderRadius: BorderRadius.circular(6),
         child: Container(
           height: 32,
-          decoration: BoxDecoration(
-            color: selected ? AppColors.accentTint : AppColors.surface,
-            border: Border.all(
-              color: selected ? AppColors.accent : AppColors.fieldBorder,
-            ),
-            borderRadius: BorderRadius.circular(6),
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 14, color: color),
+              AppIcon(icon, size: 14, color: color),
               const SizedBox(width: 6),
               Flexible(
                 child: Text(
@@ -275,61 +285,220 @@ class ReferenceConfigEditor extends ConsumerWidget {
     final service = ref.read(workbookServiceProvider);
     final many = config.cardinality == Cardinality.many;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Divider(height: 12),
-        const PanelTitle('Feuille liée'),
-        if (others.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            child: Text(
+    const label = TextStyle(
+      fontSize: 12,
+      fontWeight: FontWeight.w600,
+      color: AppColors.textSubtle,
+    );
+    return Container(
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.fromLTRB(10, 12, 10, 6),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: AppColors.gridLine)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('Feuille liée', style: label),
+          const SizedBox(height: 6),
+          if (others.isEmpty)
+            const Text(
               'Aucune autre feuille. Ajoutez un onglet pour créer une '
               'relation.',
-              style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+              style: AppText.help,
             ),
-          ),
-        for (final sheet in others)
-          PanelItem(
-            label: sheet.name,
-            selected: sheet.id == config.targetSheetId,
-            onTap: () => service.configureReference(
-              column,
-              ReferenceConfig(
-                targetSheetId: sheet.id,
-                cardinality: config.cardinality,
+          for (final (index, sheet) in others.indexed) ...[
+            if (index > 0) const SizedBox(height: 6),
+            _SheetChoice(
+              name: sheet.name,
+              selected: sheet.id == config.targetSheetId,
+              onTap: () => service.configureReference(
+                column,
+                ReferenceConfig(
+                  targetSheetId: sheet.id,
+                  cardinality: config.cardinality,
+                ),
               ),
             ),
+          ],
+          const SizedBox(height: 12),
+          const Text('Relation', style: label),
+          const SizedBox(height: 6),
+          Segmented<Cardinality>(
+            expanded: true,
+            selected: config.cardinality,
+            onSelected: (value) => service.configureReference(
+              column,
+              config.copyWith(cardinality: value),
+            ),
+            options: const [
+              (value: Cardinality.one, label: '1 – n', icon: null),
+              (value: Cardinality.many, label: 'n – n', icon: null),
+            ],
           ),
-        const PanelTitle('Relation'),
-        PanelItem(
-          label: '1 – n',
-          selected: !many,
-          onTap: () => service.configureReference(
-            column,
-            config.copyWith(cardinality: Cardinality.one),
-          ),
-        ),
-        PanelItem(
-          label: 'n – n',
-          selected: many,
-          onTap: () => service.configureReference(
-            column,
-            config.copyWith(cardinality: Cardinality.many),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(10, 4, 10, 6),
-          child: Text(
+          const SizedBox(height: 6),
+          Text(
             many
                 ? 'Chaque cellule peut pointer vers plusieurs lignes de la '
                       'feuille liée.'
                 : 'Chaque cellule pointe vers une seule ligne de la feuille '
                       'liée.',
-            style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+            style: AppText.help,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Action du menu de colonne : 38 px, d'un bord à l'autre du panneau.
+class _Action extends StatelessWidget {
+  const _Action({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.labelPrefix,
+    this.trailing,
+    this.on = false,
+    this.danger = false,
+  });
+
+  final AppIconData icon;
+  final String label;
+  final VoidCallback? onTap;
+  final String? labelPrefix;
+  final Widget? trailing;
+
+  /// Action active (« Ne plus regrouper ») : en couleur d'accent, sans fond.
+  final bool on;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    final color = !enabled
+        ? AppColors.textMuted
+        : danger
+        ? AppColors.danger
+        : (on ? AppColors.accent : AppColors.text);
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      selected: on,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          height: 38,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Row(
+            children: [
+              AppIcon(icon, color: on || danger ? color : AppColors.textMuted),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      if (labelPrefix != null)
+                        TextSpan(
+                          text: labelPrefix,
+                          style: const TextStyle(color: AppColors.textMuted),
+                        ),
+                      TextSpan(text: label),
+                    ],
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: color,
+                    fontWeight: on ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                ),
+              ),
+              ?trailing,
+            ],
           ),
         ),
-      ],
+      ),
+    );
+  }
+}
+
+/// Bouton à bordure de 6 px d'arrondi ; choisi, il prend la couleur
+/// d'accent.
+class _Bordered extends StatelessWidget {
+  const _Bordered({
+    required this.selected,
+    required this.onTap,
+    required this.child,
+  });
+
+  final bool selected;
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppColors.accentTint : AppColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(6),
+        side: BorderSide(
+          color: selected ? AppColors.accent : AppColors.fieldBorder,
+        ),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: child,
+      ),
+    );
+  }
+}
+
+/// Une feuille proposée comme cible d'une référence.
+class _SheetChoice extends StatelessWidget {
+  const _SheetChoice({
+    required this.name,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String name;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? AppColors.accent : AppColors.text;
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: _Bordered(
+        selected: selected,
+        onTap: onTap,
+        child: Container(
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: color,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                ),
+              ),
+              if (selected) AppIcon(AppIcons.check, color: color),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

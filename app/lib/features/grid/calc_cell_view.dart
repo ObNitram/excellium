@@ -48,15 +48,19 @@ class CalcCellView extends StatelessWidget {
               : Alignment.centerLeft,
           decoration: BoxDecoration(
             color: background,
-            border: selected
-                ? Border.all(color: AppColors.accent, width: 2)
-                : Border(
-                    right: const BorderSide(color: AppColors.gridLine),
-                    bottom: bottomLine
-                        ? const BorderSide(color: AppColors.gridLine)
-                        : BorderSide.none,
-                  ),
+            border: Border(
+              right: const BorderSide(color: AppColors.gridLine),
+              bottom: bottomLine
+                  ? const BorderSide(color: AppColors.gridLine)
+                  : BorderSide.none,
+            ),
           ),
+          // Cadre de sélection par-dessus : le contenu ne bouge pas.
+          foregroundDecoration: selected
+              ? BoxDecoration(
+                  border: Border.all(color: AppColors.accent, width: 2),
+                )
+              : null,
           child: Text(
             display.text,
             maxLines: 1,

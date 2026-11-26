@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
+import '../../shared/app_icons.dart';
 import '../../shared/providers.dart';
 import '../formulas/formula_text.dart';
 import '../views/view_providers.dart';
@@ -76,15 +77,16 @@ class GroupHeader extends ConsumerWidget {
       padding: EdgeInsets.only(top: first ? 0 : gap),
       child: Container(
         height: height,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: AppColors.header,
-          border: Border(
-            top: first
-                ? BorderSide.none
-                : const BorderSide(color: AppColors.headerLine),
-            bottom: const BorderSide(color: AppColors.headerLine),
-          ),
+          border: Border(bottom: BorderSide(color: AppColors.headerLine)),
         ),
+        // Le trait du haut est dessiné par-dessus, sans prendre de place.
+        foregroundDecoration: first
+            ? null
+            : const BoxDecoration(
+                border: Border(top: BorderSide(color: AppColors.headerLine)),
+              ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -102,40 +104,58 @@ class GroupHeader extends ConsumerWidget {
                   onTap: () => ref
                       .read(collapsedGroupsProvider.notifier)
                       .toggle(column, group),
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 14, right: 8),
-                    child: Row(
-                      children: [
-                        Icon(
-                          collapsed ? Icons.chevron_right : Icons.expand_more,
-                          size: 16,
-                          color: AppColors.textSubtle,
+                  // Comme dans la maquette, ce qui dépasse la largeur de la
+                  // première colonne est coupé.
+                  child: ClipRect(
+                    child: OverflowBox(
+                      alignment: Alignment.centerLeft,
+                      minWidth: 0,
+                      maxWidth: double.infinity,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 18, right: 12),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            AppIcon(
+                              AppIcons.chevronDown,
+                              size: 10,
+                              color: AppColors.text,
+                              turns: collapsed ? 3 : 0,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              column.label,
+                              maxLines: 1,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            if (group.isNone)
+                              Text(
+                                name,
+                                maxLines: 1,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textSubtle,
+                                ),
+                              )
+                            else
+                              _GroupChip(name),
+                            const SizedBox(width: 8),
+                            Text(
+                              countText,
+                              maxLines: 1,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: group.isNone
-                              ? Text(
-                                  name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textSubtle,
-                                  ),
-                                )
-                              : _GroupChip(name),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          countText,
-                          maxLines: 1,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textMuted,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
@@ -219,7 +239,7 @@ class GroupAddRow extends ConsumerWidget {
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.add, size: 14, color: AppColors.textMuted),
+                AppIcon(AppIcons.plus, size: 12, color: AppColors.textMuted),
                 SizedBox(width: 6),
                 Text(
                   'Ajouter une ligne',
@@ -243,7 +263,9 @@ class _GroupChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      height: 22,
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
         color: AppColors.accentTint,
         borderRadius: BorderRadius.circular(11),
@@ -251,9 +273,8 @@ class _GroupChip extends StatelessWidget {
       child: Text(
         label,
         maxLines: 1,
-        overflow: TextOverflow.ellipsis,
         style: const TextStyle(
-          fontSize: 12,
+          fontSize: 13,
           fontWeight: FontWeight.w600,
           color: AppColors.text,
         ),

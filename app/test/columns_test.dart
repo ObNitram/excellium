@@ -1,3 +1,4 @@
+import 'package:excellium_app/shared/controls.dart';
 import 'package:excellium_core/excellium_core.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,7 +27,7 @@ void main() {
       await tester.tap(find.text('Budget'));
       await tester.pumpAndSettle();
 
-      expect(styleTarget('Budget'), findsOneWidget);
+      expect(editReference('Budget'), findsOneWidget);
       expect(editReference('Budget'), findsOneWidget);
       expect(
         find.textContaining('Colonne entière sélectionnée'),
@@ -44,7 +45,7 @@ void main() {
       await tester.tap(cell('B2'));
       await tester.pumpAndSettle();
 
-      expect(styleTarget('B2'), findsOneWidget);
+      expect(editReference('B2'), findsOneWidget);
       expect(editReference('B2'), findsOneWidget);
     });
   });
@@ -133,16 +134,16 @@ void main() {
       await openTasks(tester);
       await tester.tap(find.text('Validé'));
       await tester.pumpAndSettle();
-      expect(find.byType(Checkbox), findsNWidgets(3));
+      expect(find.byType(AppCheckbox), findsNWidgets(3));
 
       await tester.tap(find.text('Interrupteur'));
       await tester.pumpAndSettle();
-      expect(find.byType(Switch), findsNWidgets(3));
-      expect(find.byType(Checkbox), findsNothing);
+      expect(find.byType(AppSwitch), findsNWidgets(3));
+      expect(find.byType(AppCheckbox), findsNothing);
 
       await tester.tap(find.text('Vrai / Faux'));
       await tester.pumpAndSettle();
-      expect(find.byType(Switch), findsNothing);
+      expect(find.byType(AppSwitch), findsNothing);
       expect(find.text('Vrai'), findsNWidgets(2));
       expect(find.text('Faux'), findsOneWidget);
       // En texte, le style de texte devient disponible.
@@ -170,12 +171,12 @@ void main() {
       await openTasks(tester);
       await tester.tap(find.text('Avancement'));
       await tester.pumpAndSettle();
-      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(find.byKey(const Key('percent-bar')), findsNothing);
 
       await tester.tap(find.text('Barre de progression'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(LinearProgressIndicator), findsNWidgets(3));
+      expect(find.byKey(const Key('percent-bar')), findsNWidgets(3));
       expect(
         (await book.column('Avancement')).style.percentDisplay,
         PercentDisplay.bar,

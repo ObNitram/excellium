@@ -5,6 +5,8 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
 import '../../shared/drag_data.dart';
+import '../../shared/app_icons.dart';
+import '../../shared/controls.dart';
 import '../../shared/popover.dart';
 import '../../shared/providers.dart';
 import '../grid/column_type_ui.dart';
@@ -90,22 +92,29 @@ class _ColumnHeaderState extends ConsumerState<ColumnHeader> {
         final dropAfter =
             dropping && _indexOf(candidates.first!.id) < _indexOf(column.id);
         const dropSide = BorderSide(color: AppColors.accent, width: 3);
+        // Comme dans la maquette : la colonne de la cellule sélectionnée a un
+        // en-tête teinté, souligné de 2 px ; une colonne entièrement
+        // sélectionnée est entourée d'un cadre de 2 px, dessiné par-dessus
+        // pour ne pas décaler le contenu.
         return Container(
           width: widget.width,
           height: AppSizes.rowHeight,
           decoration: BoxDecoration(
             color: active ? AppColors.accentTint : AppColors.header,
+            border: Border(
+              right: const BorderSide(color: AppColors.headerLine),
+              bottom: BorderSide(
+                width: active ? 2 : 1,
+                color: active ? AppColors.accent : AppColors.headerLine,
+              ),
+            ),
+          ),
+          foregroundDecoration: BoxDecoration(
             border: columnSelected
                 ? Border.all(color: AppColors.accent, width: 2)
                 : Border(
                     left: dropping && !dropAfter ? dropSide : BorderSide.none,
-                    right: dropAfter
-                        ? dropSide
-                        : const BorderSide(color: AppColors.headerLine),
-                    bottom: BorderSide(
-                      width: active ? 2 : 1,
-                      color: active ? AppColors.accent : AppColors.headerLine,
-                    ),
+                    right: dropAfter ? dropSide : BorderSide.none,
                   ),
           ),
           child: Stack(
@@ -125,68 +134,96 @@ class _ColumnHeaderState extends ConsumerState<ColumnHeader> {
                         button: true,
                         selected: columnSelected,
                         label: 'Sélectionner la colonne ${column.label}',
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
+                        child: InkWell(
                           onTap: _onTap,
-                          child: Row(
-                            children: [
-                              const SizedBox(width: 6),
-                              Icon(column.type.icon, size: 14, color: color),
-                              Expanded(
-                                child: Text(
-                                  column.label,
-                                  textAlign: TextAlign.center,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: active || columnSelected
-                                        ? FontWeight.w600
-                                        : FontWeight.w500,
-                                    color: color,
+                          hoverColor: AppColors.hoverOnTint,
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 6),
+                            child: Row(
+                              children: [
+                                AppIcon(
+                                  column.type.icon,
+                                  size: 14,
+                                  color: color,
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    column.label,
+                                    textAlign: TextAlign.center,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: active || columnSelected
+                                          ? FontWeight.w600
+                                          : FontWeight.w500,
+                                      color: color,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              if (sorted)
-                                Icon(
-                                  sort!.ascending
-                                      ? Icons.arrow_upward
-                                      : Icons.arrow_downward,
-                                  size: 12,
-                                  color: AppColors.accent,
-                                  semanticLabel: 'Colonne triée',
-                                ),
-                              if (spec.groupBy == column.id)
-                                const Icon(
-                                  Icons.table_rows_outlined,
-                                  size: 12,
-                                  color: AppColors.accent,
-                                  semanticLabel: 'Colonne de regroupement',
-                                ),
-                              if (filtered)
-                                const Icon(
-                                  Icons.filter_alt,
-                                  size: 12,
-                                  color: AppColors.accent,
-                                  semanticLabel: 'Colonne filtrée',
-                                ),
-                            ],
+                                if (sorted) ...[
+                                  const SizedBox(width: 6),
+                                  AppIcon(
+                                    sort!.ascending
+                                        ? AppIcons.sortAscendingBold
+                                        : AppIcons.sortDescendingBold,
+                                    size: 12,
+                                    color: AppColors.accent,
+                                    semanticLabel: 'Colonne triée',
+                                  ),
+                                ],
+                                if (spec.groupBy == column.id) ...[
+                                  const SizedBox(width: 6),
+                                  const AppIcon(
+                                    AppIcons.groupBold,
+                                    size: 12,
+                                    color: AppColors.accent,
+                                    semanticLabel: 'Colonne de regroupement',
+                                  ),
+                                ],
+                                if (filtered) ...[
+                                  const SizedBox(width: 6),
+                                  const AppIcon(
+                                    AppIcons.filterFilled,
+                                    size: 12,
+                                    color: AppColors.accent,
+                                    semanticLabel: 'Colonne filtrée',
+                                  ),
+                                  const SizedBox(width: 4),
+                                ],
+                                const SizedBox(width: 6),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
                   Popover(
-                    width: 300,
+                    width: 288,
+                    dx: 24 - widget.width,
                     anchorBuilder: (context, toggle, isOpen) => Tooltip(
                       message: 'Options de la colonne ${column.label}',
                       child: InkWell(
                         onTap: toggle,
-                        child: SizedBox(
-                          width: 22,
+                        hoverColor: AppColors.hoverOnTint,
+                        child: Container(
+                          width: 24,
                           height: AppSizes.rowHeight,
-                          child: Icon(
-                            Icons.arrow_drop_down,
-                            size: 16,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            border: Border(
+                              left: BorderSide(
+                                color: active
+                                    ? AppColors.accentTint30
+                                    : AppColors.headerLine,
+                              ),
+                            ),
+                          ),
+                          child: AppIcon(
+                            AppIcons.chevronDown,
+                            size: 10,
                             color: color,
                           ),
                         ),
@@ -195,7 +232,6 @@ class _ColumnHeaderState extends ConsumerState<ColumnHeader> {
                     panelBuilder: (context, close) =>
                         ColumnMenu(column: column, close: close),
                   ),
-                  const SizedBox(width: 4),
                 ],
               ),
               Positioned(
@@ -206,38 +242,44 @@ class _ColumnHeaderState extends ConsumerState<ColumnHeader> {
                 child: Semantics(
                   container: true,
                   label: 'Régler la largeur de la colonne ${column.label}',
-                  child: MouseRegion(
-                    cursor: SystemMouseCursors.resizeColumn,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onHorizontalDragStart: (_) =>
-                          _dragStartWidth = widget.width,
-                      onHorizontalDragUpdate: (details) {
-                        final start = _dragStartWidth;
-                        if (start == null) return;
-                        _dragStartWidth = start + details.delta.dx;
-                        ref
-                            .read(columnResizeProvider.notifier)
-                            .update(
-                              column.id.value,
-                              _dragStartWidth!
-                                  .clamp(ColumnDef.minWidth, ColumnDef.maxWidth)
-                                  .toDouble(),
-                            );
-                      },
-                      onHorizontalDragEnd: (_) async {
-                        final width = _dragStartWidth;
-                        _dragStartWidth = null;
-                        if (width != null) {
-                          await ref
-                              .read(workbookServiceProvider)
-                              .resizeColumn(column, width);
-                        }
-                        ref.read(columnResizeProvider.notifier).end();
-                      },
-                      onDoubleTap: () => ref
-                          .read(workbookServiceProvider)
-                          .resizeColumn(column, ColumnDef.defaultWidth),
+                  child: ResizeGrip(
+                    vertical: true,
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.resizeColumn,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onHorizontalDragStart: (_) =>
+                            _dragStartWidth = widget.width,
+                        onHorizontalDragUpdate: (details) {
+                          final start = _dragStartWidth;
+                          if (start == null) return;
+                          _dragStartWidth = start + details.delta.dx;
+                          ref
+                              .read(columnResizeProvider.notifier)
+                              .update(
+                                column.id.value,
+                                _dragStartWidth!
+                                    .clamp(
+                                      ColumnDef.minWidth,
+                                      ColumnDef.maxWidth,
+                                    )
+                                    .toDouble(),
+                              );
+                        },
+                        onHorizontalDragEnd: (_) async {
+                          final width = _dragStartWidth;
+                          _dragStartWidth = null;
+                          if (width != null) {
+                            await ref
+                                .read(workbookServiceProvider)
+                                .resizeColumn(column, width);
+                          }
+                          ref.read(columnResizeProvider.notifier).end();
+                        },
+                        onDoubleTap: () => ref
+                            .read(workbookServiceProvider)
+                            .resizeColumn(column, ColumnDef.defaultWidth),
+                      ),
                     ),
                   ),
                 ),

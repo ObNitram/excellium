@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
+import '../../shared/app_icons.dart';
+import '../../shared/controls.dart';
 import '../../shared/confirm.dart';
 import '../../shared/popover.dart';
 import '../../shared/providers.dart';
@@ -399,7 +401,7 @@ class _RowNumberState extends ConsumerState<_RowNumber> {
                 ),
               ),
               panelBuilder: (context, close) => PanelItem(
-                icon: Icons.delete_outline,
+                icon: AppIcons.delete,
                 label: 'Supprimer la ligne ${row.position + 1}',
                 danger: true,
                 onTap: () {
@@ -413,40 +415,43 @@ class _RowNumberState extends ConsumerState<_RowNumber> {
             left: 0,
             right: 0,
             bottom: 0,
-            height: 5,
+            height: 6,
             child: Semantics(
               container: true,
               label: 'Régler la hauteur de la ligne ${row.position + 1}',
-              child: MouseRegion(
-                cursor: SystemMouseCursors.resizeRow,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onVerticalDragStart: (_) => _dragHeight = widget.height,
-                  onVerticalDragUpdate: (details) {
-                    final start = _dragHeight;
-                    if (start == null) return;
-                    _dragHeight = start + details.delta.dy;
-                    ref
-                        .read(rowResizeProvider.notifier)
-                        .update(
-                          row.id.value,
-                          _dragHeight!
-                              .clamp(SheetRow.minHeight, SheetRow.maxHeight)
-                              .toDouble(),
-                        );
-                  },
-                  onVerticalDragEnd: (_) async {
-                    final height = _dragHeight;
-                    _dragHeight = null;
-                    if (height != null) {
-                      await ref
-                          .read(workbookServiceProvider)
-                          .resizeRow(row, height);
-                    }
-                    ref.read(rowResizeProvider.notifier).end();
-                  },
-                  onDoubleTap: () =>
-                      ref.read(workbookServiceProvider).resizeRow(row, null),
+              child: ResizeGrip(
+                vertical: false,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.resizeRow,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onVerticalDragStart: (_) => _dragHeight = widget.height,
+                    onVerticalDragUpdate: (details) {
+                      final start = _dragHeight;
+                      if (start == null) return;
+                      _dragHeight = start + details.delta.dy;
+                      ref
+                          .read(rowResizeProvider.notifier)
+                          .update(
+                            row.id.value,
+                            _dragHeight!
+                                .clamp(SheetRow.minHeight, SheetRow.maxHeight)
+                                .toDouble(),
+                          );
+                    },
+                    onVerticalDragEnd: (_) async {
+                      final height = _dragHeight;
+                      _dragHeight = null;
+                      if (height != null) {
+                        await ref
+                            .read(workbookServiceProvider)
+                            .resizeRow(row, height);
+                      }
+                      ref.read(rowResizeProvider.notifier).end();
+                    },
+                    onDoubleTap: () =>
+                        ref.read(workbookServiceProvider).resizeRow(row, null),
+                  ),
                 ),
               ),
             ),
@@ -482,7 +487,9 @@ class _AddButton extends StatelessWidget {
           child: Semantics(
             button: true,
             label: tooltip,
-            child: const Icon(Icons.add, size: 16, color: AppColors.textMuted),
+            child: const Center(
+              child: AppIcon(AppIcons.plus, color: AppColors.textMuted),
+            ),
           ),
         ),
       ),

@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../app/theme.dart';
+import 'app_icons.dart';
 
 /// Sélecteur à segments : un seul choix actif parmi quelques options.
 class Segmented<T> extends StatelessWidget {
@@ -9,10 +10,20 @@ class Segmented<T> extends StatelessWidget {
     required this.options,
     required this.selected,
     required this.onSelected,
+    this.padding = 10,
+    this.minSegmentWidth = 0,
+    this.expanded = false,
   });
 
+  /// Les segments se partagent toute la largeur disponible.
+  final bool expanded;
+
+  /// Marge de chaque segment : 10 px, 14 px pour Vrai / Faux.
+  final double padding;
+  final double minSegmentWidth;
+
   /// Les options, chacune avec son libellé et une icône facultative.
-  final List<({T value, String label, IconData? icon})> options;
+  final List<({T value, String label, AppIconData? icon})> options;
   final T? selected;
   final ValueChanged<T> onSelected;
 
@@ -21,59 +32,71 @@ class Segmented<T> extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
-        color: const Color(0xFFE6E9ED),
+        color: AppColors.track,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: expanded ? MainAxisSize.max : MainAxisSize.min,
         children: [
-          for (final option in options)
-            Semantics(
-              button: true,
-              selected: option.value == selected,
-              child: InkWell(
-                onTap: () => onSelected(option.value),
-                borderRadius: BorderRadius.circular(6),
-                child: Container(
-                  height: 28,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  decoration: BoxDecoration(
-                    color: option.value == selected ? AppColors.surface : null,
+          for (final (index, option) in options.indexed) ...[
+            if (index > 0) const SizedBox(width: 2),
+            _flex(
+              Semantics(
+                button: true,
+                selected: option.value == selected,
+                child: Material(
+                  color: option.value == selected
+                      ? AppColors.surface
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(6),
+                  child: InkWell(
+                    onTap: () => onSelected(option.value),
+                    hoverColor: AppColors.hoverOnTint,
                     borderRadius: BorderRadius.circular(6),
-                    boxShadow: option.value == selected
-                        ? const [
-                            BoxShadow(
-                              color: Color(0x2E1C2026),
-                              blurRadius: 2,
-                              offset: Offset(0, 1),
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (option.icon != null) ...[
-                        Icon(option.icon, size: 14, color: AppColors.text),
-                        const SizedBox(width: 6),
-                      ],
-                      Text(
-                        option.label,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppColors.text,
-                          fontWeight: option.value == selected
-                              ? FontWeight.w600
-                              : FontWeight.w500,
-                        ),
+                    child: Container(
+                      height: AppSizes.smallControl,
+                      constraints: BoxConstraints(minWidth: minSegmentWidth),
+                      padding: EdgeInsets.symmetric(horizontal: padding),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(6),
+                        boxShadow: option.value == selected
+                            ? AppShadows.segment
+                            : null,
                       ),
-                    ],
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (option.icon != null) ...[
+                            AppIcon(
+                              option.icon!,
+                              size: 14,
+                              color: AppColors.text,
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          Text(
+                            option.label,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.text,
+                              fontWeight: option.value == selected
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
+          ],
         ],
       ),
     );
   }
+
+  Widget _flex(Widget child) => expanded ? Expanded(child: child) : child;
 }

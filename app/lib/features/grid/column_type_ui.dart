@@ -1,5 +1,6 @@
 import 'package:excellium_core/excellium_core.dart';
-import 'package:material_ui/material_ui.dart';
+
+import '../../shared/app_icons.dart';
 
 /// Libellé et icône de chaque type de colonne.
 extension ColumnTypeUi on ColumnType {
@@ -16,17 +17,31 @@ extension ColumnTypeUi on ColumnType {
     ColumnType.formula => 'Formule',
   };
 
-  IconData get icon => switch (this) {
-    ColumnType.text => Icons.title,
-    ColumnType.number => Icons.tag,
-    ColumnType.percent => Icons.percent,
-    ColumnType.date => Icons.calendar_today_outlined,
-    ColumnType.duration => Icons.schedule,
-    ColumnType.singleCategory => Icons.label_outline,
-    ColumnType.multiCategory => Icons.label_important_outline,
-    ColumnType.boolean => Icons.check_box_outlined,
-    ColumnType.reference => Icons.link,
-    ColumnType.formula => Icons.functions,
+  AppIconData get icon => switch (this) {
+    ColumnType.text => AppIcons.text,
+    ColumnType.number => AppIcons.number,
+    ColumnType.percent => AppIcons.percent,
+    ColumnType.date => AppIcons.date,
+    ColumnType.duration => AppIcons.duration,
+    ColumnType.singleCategory => AppIcons.singleCategory,
+    ColumnType.multiCategory => AppIcons.multiCategory,
+    ColumnType.boolean => AppIcons.boolean,
+    ColumnType.reference => AppIcons.reference,
+    ColumnType.formula => AppIcons.formula,
+  };
+
+  /// Exemple de valeur, affiché à droite du type dans le menu de colonne.
+  String get hint => switch (this) {
+    ColumnType.text => 'Abc',
+    ColumnType.number => '123',
+    ColumnType.percent => '12,5 %',
+    ColumnType.date => '31/12/2026',
+    ColumnType.duration => '1 h 30',
+    ColumnType.singleCategory => 'Une valeur',
+    ColumnType.multiCategory => 'Plusieurs',
+    ColumnType.boolean => 'Vrai / Faux',
+    ColumnType.reference => 'Autre feuille',
+    ColumnType.formula => 'A × B',
   };
 
   bool get isCategory =>

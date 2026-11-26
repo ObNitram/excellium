@@ -47,7 +47,8 @@ lib/
   bootstrap/           seul dossier autorisé à connaître Drift et le moteur
                        de formules concret
   app/                 MaterialApp, thème, écran d'erreur de démarrage
-  shared/              providers du stockage, panneau flottant, glisser-déposer
+  shared/              providers du stockage, pictogrammes, panneau flottant,
+                       boutons et cases à cocher, glisser-déposer
   features/
     workbook/          écran principal, onglets, feuille active
     grid/              grille, rendu des cellules, sélection, lignes de
@@ -61,6 +62,22 @@ lib/
     kanban/            affichage Kanban
     calendar/          affichage Calendrier
 ```
+
+### Apparence
+
+L'interface reprend la maquette Claude Design (`Main.dc.html`) : mêmes
+couleurs, tailles et espacements. Ils sont rassemblés dans
+`app/lib/app/theme.dart` (`AppColors`, `AppSizes`, `AppShadows`, `AppText`).
+
+- **Police** : Inter, embarquée dans `app/assets/fonts/inter/` avec sa licence
+  (SIL Open Font License), en chiffres à chasse fixe comme dans la maquette.
+  Les tests de l'interface la chargent aussi, pour mesurer la même mise en page
+  que l'application.
+- **Pictogrammes** : les tracés SVG de la maquette, dessinés par `AppIcon`
+  (`shared/app_icons.dart`) ; aucune icône Material n'est utilisée.
+- Les boutons de la maquette qui n'ont pas encore de fonction (menus Fichier,
+  Édition…, annuler, zoom, police, couleurs, bordures, fusion) ne sont pas
+  affichés.
 
 Les écrans lisent l'état par des providers Riverpod écrits à la main (sans
 génération de code) et agissent en appelant `WorkbookService`, ou les dépôts à

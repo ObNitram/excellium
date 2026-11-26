@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
-import '../../shared/popover.dart';
+import '../../shared/app_icons.dart';
+import '../../shared/controls.dart';
+import '../../shared/segmented.dart';
 import '../grid/cell_format.dart';
 import '../grid/grid_providers.dart';
 import '../views/view_providers.dart';
@@ -31,6 +33,7 @@ class ColumnFilterEditor extends ConsumerWidget {
         return _Field(
           key: ValueKey('filter-text-${column.id.value}'),
           label: 'Contient',
+          hint: 'Contient…',
           initial: filter is TextContains ? filter.query : '',
           onChanged: (text) => set(TextContains(text)),
         );
@@ -96,6 +99,7 @@ class ColumnFilterEditor extends ConsumerWidget {
             Expanded(
               child: _DateButton(
                 label: 'À partir du',
+                key: const Key('filter-date-from'),
                 value: range.from,
                 onChanged: (date) => set(DateRange(from: date, to: range.to)),
               ),
@@ -103,7 +107,8 @@ class ColumnFilterEditor extends ConsumerWidget {
             const SizedBox(width: 6),
             Expanded(
               child: _DateButton(
-                label: 'Jusqu\'au',
+                label: 'Jusqu’au',
+                key: const Key('filter-date-to'),
                 value: range.to,
                 onChanged: (date) => set(DateRange(from: range.from, to: date)),
               ),
@@ -113,23 +118,15 @@ class ColumnFilterEditor extends ConsumerWidget {
 
       case ColumnType.boolean:
         final value = filter is BoolIs ? filter.value : null;
-        return Column(
-          children: [
-            PanelItem(
-              label: 'Tous',
-              selected: value == null,
-              onTap: () => set(null),
-            ),
-            PanelItem(
-              label: 'Vrai',
-              selected: value == true,
-              onTap: () => set(const BoolIs(true)),
-            ),
-            PanelItem(
-              label: 'Faux',
-              selected: value == false,
-              onTap: () => set(const BoolIs(false)),
-            ),
+        return Segmented<bool?>(
+          expanded: true,
+          padding: 8,
+          selected: value,
+          onSelected: (next) => set(next == null ? null : BoolIs(next)),
+          options: const [
+            (value: null, label: 'Tous', icon: null),
+            (value: true, label: 'Vrai', icon: null),
+            (value: false, label: 'Faux', icon: null),
           ],
         );
 
@@ -141,7 +138,7 @@ class ColumnFilterEditor extends ConsumerWidget {
             ? filter.categories
             : const <String>{};
         if (all.isEmpty) return const _Empty();
-        return Column(
+        return _List(
           children: [
             for (final category in all)
               _Check(
@@ -172,7 +169,7 @@ class ColumnFilterEditor extends ConsumerWidget {
             ? filter.rowIds
             : const <RowId>{};
         if (used.isEmpty) return const _Empty();
-        return Column(
+        return _List(
           children: [
             for (final id in used)
               _Check(
@@ -211,47 +208,97 @@ class _Empty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => const Padding(
-    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    padding: EdgeInsets.symmetric(horizontal: 6),
     child: Text(
       'Aucune valeur dans cette colonne pour l\'instant.',
-      style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+      style: AppText.help,
     ),
   );
 }
 
+/// Liste des valeurs à cocher, qui défile au-delà de 156 px.
+class _List extends StatelessWidget {
+  const _List({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => ConstrainedBox(
+    constraints: const BoxConstraints(maxHeight: 156),
+    child: SingleChildScrollView(
+      child: Column(
+        children: [
+          for (final (index, child) in children.indexed) ...[
+            if (index > 0) const SizedBox(height: 2),
+            child,
+          ],
+        ],
+      ),
+    ),
+  );
+}
+
+/// Champ de filtre. Un champ de plage a son libellé au-dessus ; le champ
+/// texte a un simple texte indicatif.
 class _Field extends StatelessWidget {
   const _Field({
     super.key,
     required this.label,
     required this.initial,
     required this.onChanged,
+    this.hint,
   });
 
   final String label;
   final String initial;
   final ValueChanged<String> onChanged;
 
+  /// Texte indicatif ; sans lui, [label] est écrit au-dessus du champ.
+  final String? hint;
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+    final field = SizedBox(
+      height: 32,
       child: TextFormField(
+        key: Key('filter-field-$label'),
         initialValue: initial,
         onChanged: onChanged,
         style: const TextStyle(fontSize: 13),
+        textAlignVertical: TextAlignVertical.center,
         decoration: InputDecoration(
-          isDense: true,
-          labelText: label,
-          labelStyle: const TextStyle(fontSize: 13),
-          border: const OutlineInputBorder(),
+          hintText: hint,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 8,
-            vertical: 10,
+            vertical: 6,
           ),
         ),
       ),
     );
+    if (hint != null) return field;
+    return _Labelled(label: label, child: field);
   }
+}
+
+class _Labelled extends StatelessWidget {
+  const _Labelled({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text(
+        label,
+        style: const TextStyle(fontSize: 12, color: AppColors.textSubtle),
+      ),
+      const SizedBox(height: 4),
+      child,
+    ],
+  );
 }
 
 class _Check extends StatelessWidget {
@@ -266,36 +313,18 @@ class _Check extends StatelessWidget {
   final ValueChanged<bool> onChanged;
 
   @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => onChanged(!checked),
-      borderRadius: BorderRadius.circular(6),
-      child: SizedBox(
-        height: 32,
-        child: Row(
-          children: [
-            Checkbox(
-              value: checked,
-              activeColor: AppColors.accent,
-              onChanged: (next) => onChanged(next ?? false),
-            ),
-            Expanded(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => CheckRow(
+    checked: checked,
+    label: label,
+    onChanged: onChanged,
+    height: 30,
+    padding: 6,
+  );
 }
 
 class _DateButton extends StatelessWidget {
   const _DateButton({
+    super.key,
     required this.label,
     required this.value,
     required this.onChanged,
@@ -307,50 +336,66 @@ class _DateButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 12, color: AppColors.textSubtle),
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: value?.date ?? DateTime.now(),
-                      firstDate: DateTime(1900),
-                      lastDate: DateTime(2200),
-                    );
-                    if (picked != null) {
-                      onChanged(DateValue.fromDateTime(picked));
-                    }
-                  },
+    // Même allure qu'un champ date : un cadre de 32 px avec la date, et une
+    // croix pour la retirer.
+    return _Labelled(
+      label: label,
+      child: Material(
+        color: AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(6),
+          side: const BorderSide(color: AppColors.fieldBorder),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(6),
+          onTap: () async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: value?.date ?? DateTime.now(),
+              firstDate: DateTime(1900),
+              lastDate: DateTime(2200),
+            );
+            if (picked != null) onChanged(DateValue.fromDateTime(picked));
+          },
+          child: Container(
+            height: 30,
+            padding: const EdgeInsets.only(left: 8),
+            child: Row(
+              children: [
+                Expanded(
                   child: Text(
                     value == null
-                        ? 'Choisir'
+                        ? 'jj/mm/aaaa'
                         : formatCell(value, ColumnType.date),
-                    style: const TextStyle(fontSize: 12),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: value == null
+                          ? AppColors.textMuted
+                          : AppColors.text,
+                    ),
                   ),
                 ),
-              ),
-              if (value != null)
-                IconButton(
-                  tooltip: 'Retirer la date',
-                  iconSize: 14,
-                  visualDensity: VisualDensity.compact,
-                  icon: const Icon(Icons.close),
-                  onPressed: () => onChanged(null),
-                ),
-            ],
+                if (value != null)
+                  IconBtn(
+                    tooltip: 'Retirer la date',
+                    icon: AppIcons.close,
+                    iconSize: 12,
+                    size: 28,
+                    onPressed: () => onChanged(null),
+                  )
+                else
+                  const Padding(
+                    padding: EdgeInsets.only(right: 8),
+                    child: AppIcon(
+                      AppIcons.calendar,
+                      size: 14,
+                      color: AppColors.textSubtle,
+                    ),
+                  ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }

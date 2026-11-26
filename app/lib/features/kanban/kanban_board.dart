@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
+import '../../shared/app_icons.dart';
+import '../../shared/controls.dart';
 import '../../shared/drag_data.dart';
 import '../../shared/providers.dart';
 import '../formulas/formula_text.dart';
@@ -177,12 +179,12 @@ class KanbanBoard extends ConsumerWidget {
 
   /// Jusqu'à quatre autres valeurs de la ligne, précédées du nom de leur
   /// colonne quand elle en a un.
-  static List<({IconData icon, String text})> _fields(
+  static List<({AppIconData icon, String text})> _fields(
     WidgetRef ref,
     SheetRow row,
     List<ColumnDef> columns,
   ) {
-    final fields = <({IconData icon, String text})>[];
+    final fields = <({AppIconData icon, String text})>[];
     for (final column in columns) {
       if (fields.length >= 4) break;
       if (column.type == ColumnType.formula) {
@@ -296,60 +298,75 @@ class _LaneState extends State<_Lane> {
         width: 272,
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: candidates.isEmpty
-              ? const Color(0xFFE6E9ED)
-              : AppColors.accentTint,
+          color: candidates.isEmpty ? AppColors.track : AppColors.accentTint12,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            width: 2,
-            color: candidates.isEmpty ? Colors.transparent : AppColors.accent,
-          ),
         ),
+        // Cadre de dépôt par-dessus, comme l'ombre intérieure de la maquette.
+        foregroundDecoration: candidates.isEmpty
+            ? null
+            : BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(width: 2, color: AppColors.accent),
+              ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    name,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+            Container(
+              constraints: const BoxConstraints(minHeight: 28),
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.text,
+                      ),
                     ),
                   ),
-                ),
-                Text(
-                  '${cards.length}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSubtle,
+                  const SizedBox(width: 4),
+                  Container(
+                    constraints: const BoxConstraints(minWidth: 20),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    alignment: Alignment.center,
+                    child: Text(
+                      '${cards.length}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSubtle,
+                      ),
+                    ),
                   ),
-                ),
-                if (widget.canMoveLeft)
-                  IconButton(
-                    tooltip: 'Déplacer l\'étape $name vers la gauche',
-                    iconSize: 14,
-                    visualDensity: VisualDensity.compact,
-                    icon: const Icon(Icons.chevron_left),
-                    onPressed: widget.onMoveLeft,
-                  ),
-                if (widget.canMoveRight)
-                  IconButton(
-                    tooltip: 'Déplacer l\'étape $name vers la droite',
-                    iconSize: 14,
-                    visualDensity: VisualDensity.compact,
-                    icon: const Icon(Icons.chevron_right),
-                    onPressed: widget.onMoveRight,
-                  ),
-              ],
+                  // Les flèches de toutes les étapes nommées, comme dans la
+                  // maquette ; celle qui ne mène nulle part est inactive.
+                  if (widget.canMoveLeft || widget.canMoveRight) ...[
+                    const SizedBox(width: 4),
+                    _LaneArrow(
+                      tooltip: 'Déplacer l\'étape $name vers la gauche',
+                      icon: AppIcons.chevronLeft,
+                      onPressed: widget.canMoveLeft ? widget.onMoveLeft : null,
+                    ),
+                    const SizedBox(width: 4),
+                    _LaneArrow(
+                      tooltip: 'Déplacer l\'étape $name vers la droite',
+                      icon: AppIcons.chevronRight,
+                      onPressed: widget.canMoveRight
+                          ? widget.onMoveRight
+                          : null,
+                    ),
+                  ],
+                ],
+              ),
             ),
             const SizedBox(height: 8),
             if (cards.isEmpty && !_adding)
               const Padding(
-                padding: EdgeInsets.symmetric(vertical: 6),
+                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                 child: Text(
                   'Aucune carte',
                   style: TextStyle(fontSize: 12, color: AppColors.textSubtle),
@@ -509,13 +526,21 @@ class _GhostButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 6),
           child: Row(
             children: [
-              const Icon(Icons.add, size: 14, color: AppColors.textSubtle),
+              const AppIcon(
+                AppIcons.plus,
+                size: 14,
+                color: AppColors.textSubtle,
+              ),
               const SizedBox(width: 6),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSubtle,
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSubtle,
+                  ),
                 ),
               ),
             ],
@@ -551,33 +576,36 @@ class _InlineField extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: TextField(
-              key: fieldKey,
-              controller: controller,
-              focusNode: focusNode,
-              autofocus: true,
-              style: const TextStyle(fontSize: 13),
-              // Entrée ne doit pas retirer le focus : on enchaîne les saisies.
-              onEditingComplete: () {},
-              onSubmitted: (_) => onSubmit(),
-              decoration: InputDecoration(
-                isDense: true,
-                hintText: hint,
-                filled: true,
-                fillColor: AppColors.surface,
-                border: const OutlineInputBorder(),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 9,
+            child: SizedBox(
+              height: 32,
+              child: TextField(
+                key: fieldKey,
+                controller: controller,
+                focusNode: focusNode,
+                autofocus: true,
+                style: const TextStyle(fontSize: 13),
+                textAlignVertical: TextAlignVertical.center,
+                // Entrée ne doit pas retirer le focus : on enchaîne les
+                // saisies.
+                onEditingComplete: () {},
+                onSubmitted: (_) => onSubmit(),
+                decoration: InputDecoration(
+                  hintText: hint,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
                 ),
               ),
             ),
           ),
-          IconButton(
+          const SizedBox(width: 4),
+          IconBtn(
             tooltip: 'Annuler',
+            icon: AppIcons.close,
             iconSize: 14,
-            visualDensity: VisualDensity.compact,
-            icon: const Icon(Icons.close),
+            size: 28,
+            hoverColor: AppColors.hoverOnTint,
             onPressed: onCancel,
           ),
         ],
@@ -597,22 +625,24 @@ class _Card extends StatelessWidget {
 
   final SheetRow row;
   final String title;
-  final List<({IconData icon, String text})> fields;
+  final List<({AppIconData icon, String text})> fields;
   final bool selected;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    // La carte choisie est entourée d'un anneau de 2 px, dessiné autour
+    // sans changer sa taille ; les autres ont une ombre légère.
     final card = Container(
       width: 252,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          width: selected ? 2 : 1,
-          color: selected ? AppColors.accent : AppColors.headerLine,
-        ),
+        border: Border.all(color: AppColors.headerLine),
+        boxShadow: selected
+            ? const [BoxShadow(color: AppColors.accent, spreadRadius: 2)]
+            : AppShadows.card,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -620,14 +650,19 @@ class _Card extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            style: const TextStyle(
+              fontSize: 13,
+              height: 1.35,
+              fontWeight: FontWeight.w600,
+              color: AppColors.text,
+            ),
           ),
           for (final field in fields)
             Padding(
-              padding: const EdgeInsets.only(top: 6),
+              padding: const EdgeInsets.only(top: 8),
               child: Row(
                 children: [
-                  Icon(field.icon, size: 12, color: AppColors.textMuted),
+                  AppIcon(field.icon, size: 12, color: AppColors.textMuted),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -636,6 +671,7 @@ class _Card extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 12,
+                        height: 1.3,
                         color: AppColors.textSubtle,
                       ),
                     ),
@@ -676,14 +712,8 @@ class LayoutNotice extends StatelessWidget {
       color: AppColors.header,
       alignment: Alignment.topLeft,
       padding: const EdgeInsets.all(16),
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 440),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.fieldBorder),
-        ),
+      child: DashedBox(
+        maxWidth: 440,
         child: Text(
           message,
           style: const TextStyle(
@@ -695,4 +725,28 @@ class LayoutNotice extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Flèche de 24 px qui déplace une étape.
+class _LaneArrow extends StatelessWidget {
+  const _LaneArrow({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String tooltip;
+  final AppIconData icon;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) => IconBtn(
+    tooltip: tooltip,
+    icon: icon,
+    iconSize: 10,
+    size: 24,
+    hoverColor: AppColors.hoverOnTint,
+    color: onPressed == null ? AppColors.headerLine : AppColors.textSubtle,
+    onPressed: onPressed,
+  );
 }

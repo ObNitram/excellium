@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:excellium_app/app/excellium_app.dart';
 import 'package:excellium_app/shared/providers.dart';
 import 'package:excellium_core/excellium_core.dart';
 import 'package:excellium_core/memory.dart';
 import 'package:excellium_formula/excellium_formula.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -157,12 +160,32 @@ class Workbook {
   }
 }
 
+bool _fontsLoaded = false;
+
+/// Charge la police Inter de l'application. Sans elle, les tests utilisent
+/// une police dont chaque caractère est un carré, bien plus large : les
+/// mesures (hauteur des barres, débordements) ne seraient pas celles de
+/// l'application.
+Future<void> loadAppFonts() async {
+  if (_fontsLoaded) return;
+  _fontsLoaded = true;
+  final loader = FontLoader('Inter');
+  for (final file in Directory('assets/fonts/inter').listSync()) {
+    if (file is File && file.path.endsWith('.otf')) {
+      final bytes = file.readAsBytesSync();
+      loader.addFont(Future.value(ByteData.sublistView(bytes)));
+    }
+  }
+  await loader.load();
+}
+
 /// Lance l'application sur [store], dans une fenêtre de bureau.
 Future<ProviderContainer> pumpApp(
   WidgetTester tester,
   ExcelliumStore store, {
   Size size = const Size(1600, 1000),
 }) async {
+  await tester.runAsync(loadAppFonts);
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -187,12 +210,6 @@ Finder cell(String reference) =>
 /// La référence affichée dans la barre d'édition (« B2 », « Budget »…).
 Finder editReference(String text) => find.descendant(
   of: find.byKey(const Key('edit-reference')),
-  matching: find.text(text),
-);
-
-/// La cible affichée dans la barre de style.
-Finder styleTarget(String text) => find.descendant(
-  of: find.byKey(const Key('style-target')),
   matching: find.text(text),
 );
 

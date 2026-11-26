@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
+import '../../shared/app_icons.dart';
+import '../../shared/controls.dart';
+import '../../shared/popover.dart';
 import '../../shared/drag_data.dart';
 import '../../shared/providers.dart';
 import '../grid/cell_format.dart';
@@ -124,35 +127,43 @@ class CalendarView extends ConsumerWidget {
         children: [
           Row(
             children: [
-              IconButton.outlined(
+              IconBtn(
                 tooltip: 'Mois précédent',
-                iconSize: 16,
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.chevron_left),
+                icon: AppIcons.chevronLeft,
+                iconSize: 10,
+                size: 28,
+                bordered: true,
+                color: AppColors.text,
                 onPressed: () => monthState.shift(-1),
               ),
-              const SizedBox(width: 4),
-              IconButton.outlined(
+              const SizedBox(width: 8),
+              IconBtn(
                 tooltip: 'Mois suivant',
-                iconSize: 16,
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.chevron_right),
+                icon: AppIcons.chevronRight,
+                iconSize: 10,
+                size: 28,
+                bordered: true,
+                color: AppColors.text,
                 onPressed: () => monthState.shift(1),
               ),
-              const SizedBox(width: 12),
-              SizedBox(
-                width: 160,
+              const SizedBox(width: 8),
+              Container(
+                constraints: const BoxConstraints(minWidth: 150),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Text(
                   '${_months[month.month - 1]} ${month.year}',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
+                    color: AppColors.text,
                   ),
                 ),
               ),
-              OutlinedButton(
+              const SizedBox(width: 8),
+              BarButton(
+                label: 'Aujourd\'hui',
+                dropdown: false,
                 onPressed: () => monthState.show(DateTime.now()),
-                child: const Text('Aujourd\'hui'),
               ),
               const Spacer(),
               if (undated > 0)
@@ -176,17 +187,22 @@ class CalendarView extends ConsumerWidget {
             ),
             child: Row(
               children: [
-                for (final day in _weekdays)
+                for (final (index, day) in _weekdays.indexed)
                   Expanded(
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
                         vertical: 6,
                       ),
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         border: Border(
-                          right: BorderSide(color: AppColors.headerLine),
-                          bottom: BorderSide(color: AppColors.headerLine),
+                          // Traits clairs entre les jours, foncé au bord.
+                          right: BorderSide(
+                            color: index == _weekdays.length - 1
+                                ? AppColors.headerLine
+                                : AppColors.gridLine,
+                          ),
+                          bottom: const BorderSide(color: AppColors.headerLine),
                         ),
                       ),
                       child: Text(
@@ -265,15 +281,19 @@ class CalendarView extends ConsumerWidget {
         padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
           color: candidates.isNotEmpty
-              ? AppColors.accentTint
+              ? AppColors.accentTint12
               : (inMonth ? AppColors.surface : AppColors.header),
-          border: candidates.isNotEmpty
-              ? Border.all(color: AppColors.accent, width: 2)
-              : const Border(
-                  right: BorderSide(color: AppColors.headerLine),
-                  bottom: BorderSide(color: AppColors.headerLine),
-                ),
+          border: const Border(
+            right: BorderSide(color: AppColors.headerLine),
+            bottom: BorderSide(color: AppColors.headerLine),
+          ),
         ),
+        // Cadre de dépôt par-dessus, sans décaler le contenu.
+        foregroundDecoration: candidates.isNotEmpty
+            ? BoxDecoration(
+                border: Border.all(color: AppColors.accent, width: 2),
+              )
+            : null,
         child: LayoutBuilder(
           builder: (context, box) {
             // Nombre de lignes qui tiennent sous le numéro du jour : il dépend
@@ -361,7 +381,7 @@ class CalendarView extends ConsumerWidget {
                       Container(
                         height: _Event.height,
                         margin: const EdgeInsets.only(top: _eventGap),
-                        padding: const EdgeInsets.only(left: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 2),
                         alignment: Alignment.centerLeft,
                         child: Text(more, maxLines: 1, style: moreStyle),
                       ),
@@ -376,7 +396,7 @@ class CalendarView extends ConsumerWidget {
   }
 
   static const double _dayNumberHeight = 22;
-  static const double _eventGap = 2;
+  static const double _eventGap = 4;
   static const double _slotHeight = _Event.height + _eventGap;
 
   static String _title(SheetRow row, ColumnDef? titleColumn) {
@@ -401,27 +421,34 @@ class _Event extends StatelessWidget {
   final VoidCallback? onTap;
 
   /// Hauteur fixe : le calendrier calcule combien de lignes tiennent par jour.
-  static const double height = 22;
+  /// 4 px de marge en haut et en bas, une ligne de 12 px × 1,3.
+  static const double height = 24;
 
   @override
   Widget build(BuildContext context) {
     final label = Container(
       height: height,
       alignment: Alignment.centerLeft,
-      padding: const EdgeInsets.symmetric(horizontal: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
-        color: AppColors.accentTint,
+        color: AppColors.accentTint18,
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(
-          width: 1.5,
-          color: selected ? AppColors.accent : Colors.transparent,
-        ),
       ),
+      foregroundDecoration: selected
+          ? BoxDecoration(
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(width: 2, color: AppColors.accent),
+            )
+          : null,
       child: Text(
         title,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontSize: 12, color: AppColors.text),
+        style: const TextStyle(
+          fontSize: 12,
+          height: 1.3,
+          color: AppColors.text,
+        ),
       ),
     );
     return Draggable<RowDrag>(

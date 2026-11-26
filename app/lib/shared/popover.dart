@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../app/theme.dart';
+import 'app_icons.dart';
 
 /// Un bouton qui ouvre un panneau flottant sous lui.
 ///
@@ -15,6 +16,7 @@ class Popover extends StatefulWidget {
     required this.panelBuilder,
     this.width = 280,
     this.above = false,
+    this.dx = 0,
   });
 
   /// Construit le bouton ; `toggle` ouvre ou ferme le panneau.
@@ -29,6 +31,10 @@ class Popover extends StatefulWidget {
   /// Ouvre le panneau au-dessus du bouton plutôt qu'en dessous : pour un
   /// bouton placé en bas de la fenêtre.
   final bool above;
+
+  /// Décalage horizontal du panneau par rapport au bouton : le menu d'une
+  /// colonne s'aligne sur le bord gauche de la colonne, pas sur sa flèche.
+  final double dx;
 
   @override
   State<Popover> createState() => _PopoverState();
@@ -54,9 +60,11 @@ class _PopoverState extends State<Popover> {
           // Près du bord droit de la fenêtre, le panneau s'aligne sur la
           // droite du bouton pour rester entièrement visible.
           final box = context.findRenderObject();
-          final left = box is RenderBox && box.hasSize
-              ? box.localToGlobal(Offset.zero).dx
-              : 0.0;
+          final left =
+              (box is RenderBox && box.hasSize
+                  ? box.localToGlobal(Offset.zero).dx
+                  : 0.0) +
+              widget.dx;
           final toLeft =
               left + widget.width > MediaQuery.sizeOf(overlayContext).width - 8;
           final vertical = widget.above ? 1.0 : -1.0;
@@ -76,7 +84,9 @@ class _PopoverState extends State<Popover> {
                 // haut du panneau sous le bouton.
                 targetAnchor: Alignment(horizontal, -vertical),
                 followerAnchor: Alignment(horizontal, vertical),
-                offset: Offset(0, widget.above ? -4 : 4),
+                // La maquette ouvre ses panneaux 4 px sous le bouton (34 px
+                // sous le haut d'un bouton de 28 px).
+                offset: Offset(toLeft ? 0 : widget.dx, widget.above ? -4 : 4),
                 child: Align(
                   alignment: Alignment(horizontal, vertical),
                   child: CallbackShortcuts(
@@ -87,24 +97,30 @@ class _PopoverState extends State<Popover> {
                     // même s'il ne contient aucun champ de saisie.
                     child: FocusScope(
                       autofocus: true,
-                      child: Material(
+                      child: Container(
                         key: const Key('popover-panel'),
-                        elevation: 8,
-                        color: AppColors.surface,
-                        shape: RoundedRectangleBorder(
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
                           borderRadius: BorderRadius.circular(8),
-                          side: const BorderSide(color: AppColors.headerLine),
+                          border: Border.all(color: AppColors.headerLine),
+                          boxShadow: AppShadows.panel,
                         ),
                         clipBehavior: Clip.antiAlias,
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            minWidth: widget.width,
-                            maxWidth: widget.width,
-                            maxHeight: 520,
-                          ),
-                          child: SingleChildScrollView(
-                            padding: const EdgeInsets.all(6),
-                            child: widget.panelBuilder(overlayContext, _close),
+                        child: Material(
+                          type: MaterialType.transparency,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minWidth: widget.width,
+                              maxWidth: widget.width,
+                              maxHeight: 520,
+                            ),
+                            child: SingleChildScrollView(
+                              padding: const EdgeInsets.all(6),
+                              child: widget.panelBuilder(
+                                overlayContext,
+                                _close,
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -121,7 +137,8 @@ class _PopoverState extends State<Popover> {
   }
 }
 
-/// Petite action texte, à droite d'un titre de panneau.
+/// Petite action texte, à droite d'un titre de panneau (« Tout afficher »,
+/// « Effacer »).
 class PanelAction extends StatelessWidget {
   const PanelAction({super.key, required this.label, required this.onPressed});
 
@@ -132,10 +149,15 @@ class PanelAction extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextButton(
       style: TextButton.styleFrom(
-        minimumSize: const Size(0, 22),
-        padding: const EdgeInsets.symmetric(horizontal: 6),
+        minimumSize: const Size(0, 24),
+        maximumSize: const Size(double.infinity, 24),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        textStyle: const TextStyle(fontSize: 12),
+        textStyle: const TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
       ),
       onPressed: onPressed,
       child: Text(label),
@@ -143,37 +165,46 @@ class PanelAction extends StatelessWidget {
   }
 }
 
-/// Titre de section dans un panneau.
+/// Titre de section dans un panneau, en petites capitales.
 class PanelTitle extends StatelessWidget {
   const PanelTitle(this.text, {super.key, this.trailing});
 
   final String text;
+
+  /// Action à droite du titre. Le titre garde la même hauteur avec ou sans :
+  /// il ne bouge pas quand elle apparaît.
   final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
-    // Hauteur fixe : le titre ne bouge pas quand son action apparaît.
+    // Mêmes marges que la maquette : 8 px au-dessus et 6 px sous un titre
+    // seul ; un titre avec action est centré sur 28 px.
     return Container(
-      height: 28,
-      padding: const EdgeInsets.fromLTRB(10, 2, 4, 0),
+      constraints: const BoxConstraints(minHeight: 28),
+      padding: trailing == null
+          ? const EdgeInsets.fromLTRB(10, 8, 10, 6)
+          : const EdgeInsets.fromLTRB(10, 2, 4, 2),
       child: Row(
         children: [
-          Expanded(
-            child: Text(
-              text.toUpperCase(),
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.4,
-                color: AppColors.textMuted,
-              ),
-            ),
-          ),
+          Expanded(child: Text(text.toUpperCase(), style: AppText.panelTitle)),
           ?trailing,
         ],
       ),
     );
   }
+}
+
+/// Texte d'aide dans un panneau.
+class PanelNote extends StatelessWidget {
+  const PanelNote(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    child: Text(text, style: AppText.help),
+  );
 }
 
 /// Ligne cliquable d'un panneau, avec icône, libellé et coche éventuelle.
@@ -186,18 +217,31 @@ class PanelItem extends StatelessWidget {
     this.selected = false,
     this.danger = false,
     this.trailing,
+    this.height = 36,
+    this.radius = 6,
+    this.labelPrefix,
   });
 
   final String label;
 
   /// `null` désactive l'entrée.
   final VoidCallback? onTap;
-  final IconData? icon;
+  final AppIconData? icon;
   final bool selected;
 
   /// Action destructrice, écrite en rouge.
   final bool danger;
   final Widget? trailing;
+
+  /// 36 px pour un choix, 38 px pour une action du menu de colonne.
+  final double height;
+
+  /// Coins arrondis ; 0 pour les actions du menu de colonne, qui vont d'un
+  /// bord à l'autre.
+  final double radius;
+
+  /// Début du libellé, en gris (« Type : »).
+  final String? labelPrefix;
 
   @override
   Widget build(BuildContext context) {
@@ -211,42 +255,50 @@ class PanelItem extends StatelessWidget {
       button: true,
       enabled: enabled,
       selected: selected,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(6),
-        child: Container(
-          height: 36,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            color: selected ? AppColors.accentTint : null,
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Row(
-            children: [
-              if (icon != null) ...[
-                Icon(
-                  icon,
-                  size: 16,
-                  color: selected || danger ? color : AppColors.textMuted,
-                ),
-                const SizedBox(width: 10),
-              ],
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: color,
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+      child: Material(
+        color: selected ? AppColors.accentTint : Colors.transparent,
+        borderRadius: BorderRadius.circular(radius),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(radius),
+          child: Container(
+            height: height,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Row(
+              children: [
+                if (icon != null) ...[
+                  AppIcon(
+                    icon!,
+                    color: selected || danger ? color : AppColors.textMuted,
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                Expanded(
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        if (labelPrefix != null)
+                          TextSpan(
+                            text: labelPrefix,
+                            style: const TextStyle(color: AppColors.textMuted),
+                          ),
+                        TextSpan(text: label),
+                      ],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: color,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                    ),
                   ),
                 ),
-              ),
-              ?trailing,
-              if (selected && trailing == null)
-                Icon(Icons.check, size: 16, color: color),
-            ],
+                ?trailing,
+                if (selected && trailing == null)
+                  AppIcon(AppIcons.check, color: color),
+              ],
+            ),
           ),
         ),
       ),
@@ -254,7 +306,17 @@ class PanelItem extends StatelessWidget {
   }
 }
 
-/// Bouton à bordure des barres, avec flèche, qui sert d'ancre à un panneau.
+/// Trait qui sépare deux groupes d'entrées d'un panneau.
+class PanelDivider extends StatelessWidget {
+  const PanelDivider({super.key});
+
+  @override
+  Widget build(BuildContext context) =>
+      const Divider(height: 1, thickness: 1, color: AppColors.gridLine);
+}
+
+/// Bouton à bordure de la barre de vue, avec flèche, qui sert d'ancre à un
+/// panneau.
 class BarButton extends StatelessWidget {
   const BarButton({
     super.key,
@@ -263,51 +325,78 @@ class BarButton extends StatelessWidget {
     this.icon,
     this.strong = false,
     this.dropdown = true,
+    this.prefix,
+    this.accent = false,
   });
 
   final String label;
   final VoidCallback onPressed;
-  final IconData? icon;
+  final AppIconData? icon;
+
+  /// Libellé en gras (le bouton des vues).
   final bool strong;
   final bool dropdown;
 
+  /// Début du libellé, en gris et en graisse normale (« Vue : »).
+  final String? prefix;
+
+  /// Bouton d'action : bordure et texte de la couleur d'accent.
+  final bool accent;
+
   @override
   Widget build(BuildContext context) {
+    final color = accent ? AppColors.accent : AppColors.text;
     return Semantics(
       button: true,
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(6),
-        child: Container(
-          height: 28,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            border: Border.all(color: AppColors.fieldBorder),
-            borderRadius: BorderRadius.circular(6),
+      child: Material(
+        color: AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(6),
+          side: BorderSide(
+            color: accent ? AppColors.accent : AppColors.fieldBorder,
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (icon != null) ...[
-                Icon(icon, size: 14, color: AppColors.text),
-                const SizedBox(width: 6),
+        ),
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(6),
+          child: Container(
+            height: AppSizes.smallControl,
+            padding: EdgeInsets.symmetric(horizontal: accent ? 10 : 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (icon != null) ...[
+                  AppIcon(icon!, size: 14, color: color),
+                  const SizedBox(width: 6),
+                ],
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      if (prefix != null)
+                        TextSpan(
+                          text: prefix,
+                          style: const TextStyle(
+                            color: AppColors.textMuted,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      TextSpan(text: label),
+                    ],
+                  ),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: color,
+                    fontWeight: strong || accent
+                        ? FontWeight.w600
+                        : FontWeight.w500,
+                  ),
+                ),
+                if (dropdown) ...[
+                  const SizedBox(width: 6),
+                  AppIcon(AppIcons.chevronDown, size: 10, color: color),
+                ],
               ],
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppColors.text,
-                  fontWeight: strong ? FontWeight.w600 : FontWeight.w500,
-                ),
-              ),
-              if (dropdown)
-                const Icon(
-                  Icons.arrow_drop_down,
-                  size: 16,
-                  color: AppColors.text,
-                ),
-            ],
+            ),
           ),
         ),
       ),

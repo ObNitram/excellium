@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
+import '../../shared/app_icons.dart';
 import '../../shared/providers.dart';
 import '../formulas/formula_text.dart';
 import '../grid/grid_providers.dart';
@@ -135,6 +136,7 @@ class _FormulaFieldState extends State<_FormulaField> {
   Widget build(BuildContext context) {
     final error = widget.error;
     final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(6),
       borderSide: BorderSide(
         color: error == null ? AppColors.fieldBorder : AppColors.danger,
         width: error == null ? 1 : 2,
@@ -150,31 +152,33 @@ class _FormulaFieldState extends State<_FormulaField> {
           flex: 3,
           child: Semantics(
             label: widget.label,
-            child: TextField(
-              controller: _controller,
-              focusNode: _focus,
-              onChanged: widget.onChanged,
-              autocorrect: false,
-              enableSuggestions: false,
-              style: const TextStyle(
-                fontSize: 13,
-                fontFamily: 'monospace',
-                fontFamilyFallback: ['Roboto Mono', 'Menlo', 'Consolas'],
-              ),
-              decoration: InputDecoration(
-                isDense: true,
-                hintText: widget.hint,
-                border: border,
-                enabledBorder: border,
-                focusedBorder: border.copyWith(
-                  borderSide: BorderSide(
-                    color: error == null ? AppColors.accent : AppColors.danger,
-                    width: 2,
+            child: SizedBox(
+              height: 32,
+              child: TextField(
+                controller: _controller,
+                focusNode: _focus,
+                onChanged: widget.onChanged,
+                autocorrect: false,
+                enableSuggestions: false,
+                textAlignVertical: TextAlignVertical.center,
+                style: AppText.mono.copyWith(color: AppColors.text),
+                decoration: InputDecoration(
+                  hintText: widget.hint,
+                  hintStyle: AppText.mono.copyWith(color: AppColors.textMuted),
+                  border: border,
+                  enabledBorder: border,
+                  focusedBorder: border.copyWith(
+                    borderSide: BorderSide(
+                      color: error == null
+                          ? AppColors.accent
+                          : AppColors.danger,
+                      width: 2,
+                    ),
                   ),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                 ),
               ),
             ),
@@ -191,8 +195,8 @@ class _FormulaFieldState extends State<_FormulaField> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
-                      Icons.error_outline,
+                    const AppIcon(
+                      AppIcons.error,
                       size: 14,
                       color: AppColors.danger,
                     ),
@@ -204,6 +208,7 @@ class _FormulaFieldState extends State<_FormulaField> {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 12,
+                          height: 1.4,
                           color: AppColors.danger,
                         ),
                       ),
@@ -214,7 +219,7 @@ class _FormulaFieldState extends State<_FormulaField> {
             ),
           ),
         ] else if (widget.note != null) ...[
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Text(
             widget.note!,
             style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
@@ -253,9 +258,9 @@ class FormulaEditor extends ConsumerWidget {
       autofocus: true,
       focusSignal: ref.watch(editRequestProvider),
       error: values.error,
-      note: 'Calculée pour chaque ligne',
+      note: 'Calculée pour chaque ligne de la colonne',
       leading: const Padding(
-        padding: EdgeInsets.only(right: 8),
+        padding: EdgeInsets.only(right: 10),
         child: Text(
           '=',
           style: TextStyle(
@@ -326,14 +331,28 @@ class _CalcEditorState extends ConsumerState<CalcEditor> {
             Padding(
               padding: const EdgeInsets.only(left: 6),
               child: OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(0, 30),
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  textStyle: const TextStyle(fontSize: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                ),
+                style:
+                    OutlinedButton.styleFrom(
+                      visualDensity: VisualDensity.standard,
+                      minimumSize: const Size(0, 28),
+                      maximumSize: const Size(double.infinity, 28),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      foregroundColor: AppColors.text,
+                      backgroundColor: AppColors.surface,
+                      side: const BorderSide(color: AppColors.fieldBorder),
+                      textStyle: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ).copyWith(
+                      overlayColor: const WidgetStatePropertyAll(
+                        AppColors.hover,
+                      ),
+                    ),
                 onPressed: () {
                   final field = _field.currentState;
                   if (field == null) return;

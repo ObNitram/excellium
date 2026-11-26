@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
+import '../../shared/app_icons.dart';
 import '../../shared/providers.dart';
 
 import 'package:excellium_core/excellium_core.dart';
@@ -90,8 +91,8 @@ class _TitleBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: AppSizes.barHeight,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      height: AppSizes.titleBarHeight,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: const BoxDecoration(
         color: AppColors.surface,
         border: Border(bottom: BorderSide(color: AppColors.gridLine)),
@@ -101,16 +102,24 @@ class _TitleBar extends StatelessWidget {
           Container(
             width: 28,
             height: 28,
+            alignment: Alignment.center,
             decoration: BoxDecoration(
               color: AppColors.accent,
               borderRadius: BorderRadius.circular(7),
             ),
-            child: const Icon(Icons.grid_on, size: 16, color: Colors.white),
+            child: const AppIcon(AppIcons.logo, color: AppColors.surface),
           ),
           const SizedBox(width: 12),
-          const Text(
-            'Excellium',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              'Excellium',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: AppColors.text,
+              ),
+            ),
           ),
         ],
       ),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
+import '../../shared/app_icons.dart';
 import '../formulas/formula_text.dart';
 import 'calc_cell_view.dart';
 import 'grid_providers.dart';
@@ -57,13 +58,15 @@ class _CalcPaneBarState extends ConsumerState<CalcPaneBar> {
             child: InkWell(
               onTap: notifier.toggle,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
+                padding: const EdgeInsets.only(left: 10, right: 12),
                 child: Row(
                   children: [
-                    Icon(
-                      pane.hidden ? Icons.expand_less : Icons.expand_more,
-                      size: 14,
+                    // Replié, la flèche pointe vers le haut.
+                    AppIcon(
+                      AppIcons.chevronDown,
+                      size: 10,
                       color: AppColors.textSubtle,
+                      turns: pane.hidden ? 2 : 0,
                     ),
                     const SizedBox(width: 6),
                     const Text(
@@ -104,13 +107,18 @@ class _CalcPaneBarState extends ConsumerState<CalcPaneBar> {
                     },
                     onVerticalDragEnd: (_) => _dragHeight = null,
                     onDoubleTap: notifier.reset,
-                    child: Center(
-                      child: Container(
-                        width: 40,
-                        height: 3,
-                        decoration: BoxDecoration(
-                          color: AppColors.fieldBorder,
-                          borderRadius: BorderRadius.circular(2),
+                    // La poignée est centrée sur la fenêtre, comme dans la
+                    // maquette (80 px réservés à droite).
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 80),
+                      child: Center(
+                        child: Container(
+                          width: 40,
+                          height: 3,
+                          decoration: BoxDecoration(
+                            color: AppColors.fieldBorder,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
                         ),
                       ),
                     ),
@@ -222,6 +230,7 @@ class _CalcGridState extends ConsumerState<CalcGrid> {
                             ),
                             width: widget.widthOf(column),
                             height: calcRowHeight,
+                            background: AppColors.calcSurface,
                             selected:
                                 selection is CalcCellSelected &&
                                 selection.index == index &&

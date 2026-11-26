@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
+import '../../shared/app_icons.dart';
+import '../../shared/controls.dart';
 import '../../shared/popover.dart';
 import '../../shared/providers.dart';
 import '../grid/cell_format.dart';
@@ -88,237 +90,232 @@ class _ViewBarState extends ConsumerState<ViewBar> {
         color: AppColors.header,
         border: Border(bottom: BorderSide(color: AppColors.headerLine)),
       ),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 6,
-        crossAxisAlignment: WrapCrossAlignment.center,
+      // Comme dans la maquette : les menus et les critères à gauche, le
+      // nombre de lignes et les actions poussés à droite.
+      child: Row(
         children: [
-          Popover(
-            anchorBuilder: (context, toggle, _) => BarButton(
-              icon: Icons.filter_alt_outlined,
-              label:
-                  'Vue : ${matched?.name ?? (full ? 'complète' : 'non enregistrée')}',
-              strong: true,
-              onPressed: toggle,
-            ),
-            panelBuilder: (context, close) => Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
+          Expanded(
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                const PanelTitle('Vues de la feuille'),
-                PanelItem(
-                  label: 'Vue complète',
-                  selected: full,
-                  onTap: () {
-                    view.reset();
-                    close();
-                  },
-                ),
-                if (saved.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(10),
-                    child: Text(
-                      'Aucune vue enregistrée pour cette feuille.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textMuted,
-                      ),
-                    ),
+                Popover(
+                  anchorBuilder: (context, toggle, _) => BarButton(
+                    icon: AppIcons.filter,
+                    prefix: 'Vue : ',
+                    label:
+                        matched?.name ??
+                        (full ? 'complète' : 'non enregistrée'),
+                    strong: true,
+                    onPressed: toggle,
                   ),
-                for (final entry in saved)
-                  PanelItem(
-                    label: entry.name,
-                    selected: entry.id == matched?.id,
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (entry.id == matched?.id)
-                          const Icon(
-                            Icons.check,
-                            size: 16,
-                            color: AppColors.accent,
-                          ),
-                        IconButton(
-                          tooltip: 'Supprimer la vue ${entry.name}',
-                          iconSize: 14,
-                          visualDensity: VisualDensity.compact,
-                          icon: const Icon(Icons.close),
-                          onPressed: () => ref
-                              .read(storeProvider)
-                              .views
-                              .deleteView(entry.id),
-                        ),
-                      ],
-                    ),
-                    onTap: () {
-                      view.apply(entry.spec);
-                      close();
-                    },
-                  ),
-              ],
-            ),
-          ),
-          Popover(
-            width: 220,
-            anchorBuilder: (context, toggle, _) => BarButton(
-              icon: _layoutIcon(kind),
-              label: 'Affichage : ${_layoutLabel(kind)}',
-              onPressed: toggle,
-            ),
-            panelBuilder: (context, close) => Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const PanelTitle('Type d\'affichage'),
-                for (final option in LayoutKind.values)
-                  PanelItem(
-                    icon: _layoutIcon(option),
-                    label: _layoutLabel(option),
-                    selected: option == kind,
-                    onTap: () {
-                      view.setLayout(ViewLayout(option));
-                      close();
-                    },
-                  ),
-              ],
-            ),
-          ),
-          Popover(
-            anchorBuilder: (context, toggle, _) => BarButton(
-              icon: Icons.view_column_outlined,
-              label: hidden.isEmpty
-                  ? 'Colonnes'
-                  : 'Colonnes : ${hidden.length} '
-                        '${hidden.length > 1 ? 'masquées' : 'masquée'}',
-              onPressed: toggle,
-            ),
-            panelBuilder: (context, close) => Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                PanelTitle(
-                  'Colonnes affichées',
-                  trailing: PanelAction(
-                    label: 'Tout afficher',
-                    onPressed: view.showAllColumns,
-                  ),
-                ),
-                for (final column in columns)
-                  _ColumnCheck(
-                    column: column,
-                    shown: !spec.hiddenColumnIds.contains(column.id),
-                    // On ne masque pas la dernière colonne visible.
-                    onChanged: (show) {
-                      if (!show && hidden.length >= columns.length - 1) return;
-                      view.setHidden(column.id, hidden: !show);
-                    },
-                  ),
-              ],
-            ),
-          ),
-          if (kind == LayoutKind.grid)
-            Popover(
-              width: 260,
-              anchorBuilder: (context, toggle, _) => BarButton(
-                icon: Icons.table_rows_outlined,
-                label: groupColumn == null
-                    ? 'Regrouper'
-                    : 'Regroupé par : ${columnTitle(groupColumn)}',
-                onPressed: toggle,
-              ),
-              panelBuilder: (context, close) => Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const PanelTitle('Regrouper les lignes par'),
-                  PanelItem(
-                    label: 'Aucun regroupement',
-                    selected: groupColumn == null,
-                    onTap: () {
-                      view.setGroupBy(null);
-                      close();
-                    },
-                  ),
-                  if (groupable.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(10),
-                      child: Text(
-                        'Aucune colonne de type Catégorie ou Référence dans '
-                        'cette feuille.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textMuted,
-                        ),
-                      ),
-                    ),
-                  for (final column in groupable)
-                    PanelItem(
-                      icon: column.type.icon,
-                      label: columnTitle(column),
-                      selected: column.id == groupColumn?.id,
-                      onTap: () {
-                        view.setGroupBy(column.id);
-                        close();
-                      },
-                    ),
-                ],
-              ),
-            ),
-          if (kind != LayoutKind.grid)
-            Popover(
-              width: 260,
-              anchorBuilder: (context, toggle, _) => BarButton(
-                label:
-                    '${kind == LayoutKind.kanban ? 'Étapes' : 'Date'} : '
-                    '${keyColumn == null ? 'aucune colonne' : columnTitle(keyColumn)}',
-                onPressed: toggle,
-              ),
-              panelBuilder: (context, close) {
-                final wanted = kind == LayoutKind.kanban
-                    ? ColumnType.singleCategory
-                    : ColumnType.date;
-                final candidates = [
-                  for (final column in columns)
-                    if (column.type == wanted) column,
-                ];
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    PanelTitle(
-                      kind == LayoutKind.kanban
-                          ? 'Colonne des étapes'
-                          : 'Colonne de date',
-                    ),
-                    if (candidates.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.all(10),
-                        child: Text(
-                          'Aucune colonne de type « ${wanted.label} » dans '
-                          'cette feuille.',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textMuted,
-                          ),
-                        ),
-                      ),
-                    for (final column in candidates)
+                  panelBuilder: (context, close) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const PanelTitle('Vues de la feuille'),
                       PanelItem(
-                        icon: column.type.icon,
-                        label: columnTitle(column),
-                        selected: column.id == keyColumn?.id,
+                        label: 'Vue complète',
+                        selected: full,
                         onTap: () {
-                          view.setLayout(ViewLayout(kind, column.id));
+                          view.reset();
                           close();
                         },
                       ),
-                  ],
-                );
-              },
+                      if (saved.isEmpty)
+                        const PanelNote(
+                          'Aucune vue enregistrée pour cette feuille.',
+                        ),
+                      for (final entry in saved)
+                        PanelItem(
+                          label: entry.name,
+                          selected: entry.id == matched?.id,
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (entry.id == matched?.id) ...[
+                                const AppIcon(
+                                  AppIcons.check,
+                                  color: AppColors.accent,
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              Transform.translate(
+                                offset: const Offset(6, 0),
+                                child: IconBtn(
+                                  tooltip: 'Supprimer la vue ${entry.name}',
+                                  icon: AppIcons.closeBold,
+                                  iconSize: 12,
+                                  size: 28,
+                                  onPressed: () => ref
+                                      .read(storeProvider)
+                                      .views
+                                      .deleteView(entry.id),
+                                ),
+                              ),
+                            ],
+                          ),
+                          onTap: () {
+                            view.apply(entry.spec);
+                            close();
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+                Popover(
+                  width: 220,
+                  anchorBuilder: (context, toggle, _) => BarButton(
+                    icon: _layoutIcon(kind),
+                    label: 'Affichage : ${_layoutLabel(kind)}',
+                    onPressed: toggle,
+                  ),
+                  panelBuilder: (context, close) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const PanelTitle('Type d\'affichage'),
+                      for (final option in LayoutKind.values)
+                        PanelItem(
+                          icon: _layoutIcon(option),
+                          label: _layoutLabel(option),
+                          selected: option == kind,
+                          onTap: () {
+                            view.setLayout(ViewLayout(option));
+                            close();
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+                Popover(
+                  anchorBuilder: (context, toggle, _) => BarButton(
+                    icon: AppIcons.columns,
+                    label: hidden.isEmpty
+                        ? 'Colonnes'
+                        : 'Colonnes : ${hidden.length} '
+                              '${hidden.length > 1 ? 'masquées' : 'masquée'}',
+                    onPressed: toggle,
+                  ),
+                  panelBuilder: (context, close) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      PanelTitle(
+                        'Colonnes affichées',
+                        trailing: PanelAction(
+                          label: 'Tout afficher',
+                          onPressed: view.showAllColumns,
+                        ),
+                      ),
+                      for (final column in columns)
+                        CheckRow(
+                          checked: !spec.hiddenColumnIds.contains(column.id),
+                          icon: column.type.icon,
+                          label: columnTitle(column),
+                          detail: column.type.label,
+                          // On ne masque pas la dernière colonne visible.
+                          onChanged: (show) {
+                            if (!show && hidden.length >= columns.length - 1) {
+                              return;
+                            }
+                            view.setHidden(column.id, hidden: !show);
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+                if (kind == LayoutKind.grid)
+                  Popover(
+                    width: 260,
+                    anchorBuilder: (context, toggle, _) => BarButton(
+                      label: groupColumn == null
+                          ? 'Regrouper'
+                          : 'Regroupé par : ${columnTitle(groupColumn)}',
+                      onPressed: toggle,
+                    ),
+                    panelBuilder: (context, close) => Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const PanelTitle('Regrouper les lignes par'),
+                        PanelItem(
+                          label: 'Aucun regroupement',
+                          selected: groupColumn == null,
+                          onTap: () {
+                            view.setGroupBy(null);
+                            close();
+                          },
+                        ),
+                        if (groupable.isEmpty)
+                          const PanelNote(
+                            'Aucune colonne de type Catégorie ou Référence dans '
+                            'cette feuille.',
+                          ),
+                        for (final column in groupable)
+                          PanelItem(
+                            label: columnTitle(column),
+                            selected: column.id == groupColumn?.id,
+                            onTap: () {
+                              view.setGroupBy(column.id);
+                              close();
+                            },
+                          ),
+                      ],
+                    ),
+                  ),
+                if (kind != LayoutKind.grid)
+                  Popover(
+                    width: 260,
+                    anchorBuilder: (context, toggle, _) => BarButton(
+                      label:
+                          '${kind == LayoutKind.kanban ? 'Étapes' : 'Date'} : '
+                          '${keyColumn == null ? 'aucune colonne' : columnTitle(keyColumn)}',
+                      onPressed: toggle,
+                    ),
+                    panelBuilder: (context, close) {
+                      final wanted = kind == LayoutKind.kanban
+                          ? ColumnType.singleCategory
+                          : ColumnType.date;
+                      final candidates = [
+                        for (final column in columns)
+                          if (column.type == wanted) column,
+                      ];
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          PanelTitle(
+                            kind == LayoutKind.kanban
+                                ? 'Colonne des étapes'
+                                : 'Colonne de date',
+                          ),
+                          if (candidates.isEmpty)
+                            PanelNote(
+                              'Aucune colonne de type « ${wanted.label} » dans '
+                              'cette feuille.',
+                            ),
+                          for (final column in candidates)
+                            PanelItem(
+                              label: columnTitle(column),
+                              selected: column.id == keyColumn?.id,
+                              onTap: () {
+                                view.setLayout(ViewLayout(kind, column.id));
+                                close();
+                              },
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                for (final (label, remove) in items)
+                  _Criterion(label: label, onRemove: remove),
+              ],
             ),
-          for (final (label, remove) in items)
-            _Criterion(label: label, onRemove: remove),
-          if (spec.query.activeFilters.isNotEmpty)
+          ),
+          if (spec.query.activeFilters.isNotEmpty) ...[
+            const SizedBox(width: 8),
             Text(
               _count(
                 shown.where((row) => !row.isEmpty).length,
@@ -326,49 +323,73 @@ class _ViewBarState extends ConsumerState<ViewBar> {
               ),
               style: const TextStyle(fontSize: 12, color: AppColors.textSubtle),
             ),
-          if (!full && matched == null && !_naming)
+          ],
+          if (!full && matched == null && !_naming) ...[
+            const SizedBox(width: 8),
             BarButton(
               label: 'Enregistrer la vue',
-              icon: Icons.bookmark_add_outlined,
+              icon: AppIcons.bookmark,
               dropdown: false,
+              accent: true,
               onPressed: () => setState(() => _naming = true),
             ),
+          ],
           if (!full && matched == null && _naming) ...[
+            const SizedBox(width: 8),
             SizedBox(
               width: 180,
+              height: _controlHeight,
               child: TextField(
                 controller: _nameController,
                 autofocus: true,
                 style: const TextStyle(fontSize: 13),
+                textAlignVertical: TextAlignVertical.center,
                 decoration: const InputDecoration(
-                  isCollapsed: true,
                   hintText: 'Nom de la vue',
-                  filled: true,
-                  fillColor: AppColors.surface,
-                  border: OutlineInputBorder(),
-                  constraints: BoxConstraints.tightFor(height: _controlHeight),
-                  contentPadding: EdgeInsets.fromLTRB(8, 5, 8, 5),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                 ),
                 onSubmitted: (_) => _save(spec),
               ),
             ),
+            const SizedBox(width: 6),
             FilledButton(
-              style: _compact,
+              style: _compact.copyWith(
+                padding: const WidgetStatePropertyAll(
+                  EdgeInsets.symmetric(horizontal: 12),
+                ),
+              ),
               onPressed: () => _save(spec),
               child: const Text('Enregistrer'),
             ),
+            const SizedBox(width: 6),
             TextButton(
-              style: _compact,
+              style: _compact.copyWith(
+                foregroundColor: const WidgetStatePropertyAll(
+                  AppColors.textSubtle,
+                ),
+                textStyle: const WidgetStatePropertyAll(
+                  TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
               onPressed: () => setState(() => _naming = false),
               child: const Text('Annuler'),
             ),
           ],
-          if (hasCriteria)
+          if (hasCriteria) ...[
+            const SizedBox(width: 8),
             TextButton(
               style: _compact,
               onPressed: view.clearCriteria,
               child: const Text('Tout effacer'),
             ),
+          ],
         ],
       ),
     );
@@ -387,7 +408,7 @@ class _ViewBarState extends ConsumerState<ViewBar> {
     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
     visualDensity: VisualDensity.standard,
     textStyle: const WidgetStatePropertyAll(
-      TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+      TextStyle(fontFamily: 'Inter', fontSize: 13, fontWeight: FontWeight.w600),
     ),
     shape: WidgetStatePropertyAll(
       RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
@@ -403,10 +424,10 @@ class _ViewBarState extends ConsumerState<ViewBar> {
     LayoutKind.calendar => 'Calendrier',
   };
 
-  static IconData _layoutIcon(LayoutKind kind) => switch (kind) {
-    LayoutKind.grid => Icons.grid_on,
-    LayoutKind.kanban => Icons.view_kanban_outlined,
-    LayoutKind.calendar => Icons.calendar_month_outlined,
+  static AppIconData _layoutIcon(LayoutKind kind) => switch (kind) {
+    LayoutKind.grid => AppIcons.grid,
+    LayoutKind.kanban => AppIcons.kanban,
+    LayoutKind.calendar => AppIcons.calendar,
   };
 
   /// Écrit un filtre en clair, par exemple « Statut est En cours ou À faire ».
@@ -457,8 +478,8 @@ class _Criterion extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 28,
-      padding: const EdgeInsets.only(left: 10),
+      height: AppSizes.smallControl,
+      padding: const EdgeInsets.only(left: 10, right: 2),
       decoration: BoxDecoration(
         color: AppColors.surface,
         border: Border.all(color: AppColors.fieldBorder),
@@ -468,65 +489,15 @@ class _Criterion extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(label, style: const TextStyle(fontSize: 13)),
-          IconButton(
+          const SizedBox(width: 2),
+          IconBtn(
             tooltip: 'Retirer : $label',
+            icon: AppIcons.closeBold,
             iconSize: 12,
-            visualDensity: VisualDensity.compact,
-            icon: const Icon(Icons.close),
+            size: 22,
             onPressed: onRemove,
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _ColumnCheck extends StatelessWidget {
-  const _ColumnCheck({
-    required this.column,
-    required this.shown,
-    required this.onChanged,
-  });
-
-  final ColumnDef column;
-  final bool shown;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => onChanged(!shown),
-      borderRadius: BorderRadius.circular(6),
-      child: SizedBox(
-        height: 32,
-        child: Row(
-          children: [
-            Checkbox(
-              value: shown,
-              activeColor: AppColors.accent,
-              onChanged: (next) => onChanged(next ?? false),
-            ),
-            Icon(column.type.icon, size: 14, color: AppColors.textMuted),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                columnTitle(column),
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Text(
-                column.type.label,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textMuted,
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

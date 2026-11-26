@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
+import '../../shared/app_icons.dart';
+import '../../shared/controls.dart';
 import '../../shared/popover.dart';
 import '../../shared/providers.dart';
 import '../columns/column_menu.dart';
@@ -64,59 +66,105 @@ class ReferencePicker extends ConsumerWidget {
         ? 'Aucune référence'
         : current.map((id) => labels[id] ?? 'Ligne supprimée').join(', ');
 
+    // Comme dans la maquette : un seul champ, avec à gauche la loupe qui
+    // règle les colonnes de recherche. Cliquer dans le champ ouvre la liste
+    // des lignes, où l'on tape la recherche.
     return Row(
       children: [
-        Popover(
-          width: 300,
-          anchorBuilder: (context, toggle, _) => Tooltip(
-            message: 'Paramétrer la recherche',
-            child: InkWell(
-              onTap: toggle,
-              borderRadius: BorderRadius.circular(6),
-              child: Container(
-                height: 32,
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.fieldBorder),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.search, size: 16, color: AppColors.textSubtle),
-                    Icon(
-                      Icons.arrow_drop_down,
-                      size: 16,
-                      color: AppColors.textSubtle,
+        Flexible(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420, minWidth: 240),
+            child: Container(
+              height: 32,
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                border: Border.all(color: AppColors.fieldBorder),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                children: [
+                  Popover(
+                    width: 300,
+                    anchorBuilder: (context, toggle, _) => Tooltip(
+                      message: 'Paramétrer la recherche',
+                      child: InkWell(
+                        onTap: toggle,
+                        borderRadius: const BorderRadius.horizontal(
+                          left: Radius.circular(5),
+                        ),
+                        child: Container(
+                          height: 30,
+                          padding: const EdgeInsets.only(left: 8, right: 6),
+                          decoration: const BoxDecoration(
+                            border: Border(
+                              right: BorderSide(color: AppColors.headerLine),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              AppIcon(AppIcons.search),
+                              SizedBox(width: 4),
+                              AppIcon(AppIcons.chevronDown, size: 10),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                  ],
-                ),
+                    panelBuilder: (context, close) =>
+                        _SearchColumns(column: column, target: targetSheet!),
+                  ),
+                  Expanded(
+                    child: Popover(
+                      width: 420,
+                      anchorBuilder: (context, toggle, _) => Semantics(
+                        button: true,
+                        child: InkWell(
+                          onTap: toggle,
+                          hoverColor: Colors.transparent,
+                          mouseCursor: SystemMouseCursors.text,
+                          child: Container(
+                            height: 30,
+                            alignment: Alignment.centerLeft,
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            child: Text(
+                              'Rechercher dans ${targetSheet!.name}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      panelBuilder: (context, close) =>
+                          _Results(row: row, column: column, close: close),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-          panelBuilder: (context, close) =>
-              _SearchColumns(column: column, target: targetSheet!),
-        ),
-        const SizedBox(width: 6),
-        Popover(
-          width: 380,
-          anchorBuilder: (context, toggle, _) => BarButton(
-            label: 'Rechercher dans ${targetSheet!.name}',
-            onPressed: toggle,
-          ),
-          panelBuilder: (context, close) =>
-              _Results(row: row, column: column, close: close),
         ),
         const SizedBox(width: 10),
         Flexible(
-          child: Text(
-            summary,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 13, color: AppColors.textSubtle),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 320),
+            child: Text(
+              summary,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 13,
+                height: 1.4,
+                color: AppColors.textSubtle,
+              ),
+            ),
           ),
         ),
-        const SizedBox(width: 4),
+        const SizedBox(width: 10),
         relation,
       ],
     );
@@ -149,48 +197,16 @@ class _SearchColumns extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(10, 0, 10, 6),
           child: Text(
             'Colonnes de « ${target.name} » prises en compte par la recherche.',
-            style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+            style: AppText.help,
           ),
         ),
         for (final candidate in targetColumns)
-          InkWell(
-            onTap: () => _toggle(ref, config, searched, candidate.id),
-            child: SizedBox(
-              height: 32,
-              child: Row(
-                children: [
-                  Checkbox(
-                    value: searched.contains(candidate.id),
-                    activeColor: AppColors.accent,
-                    onChanged: (_) =>
-                        _toggle(ref, config, searched, candidate.id),
-                  ),
-                  Icon(
-                    candidate.type.icon,
-                    size: 14,
-                    color: AppColors.textMuted,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      columnTitle(candidate),
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: Text(
-                      candidate.type.label,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          CheckRow(
+            checked: searched.contains(candidate.id),
+            icon: candidate.type.icon,
+            label: columnTitle(candidate),
+            detail: candidate.type.label,
+            onChanged: (_) => _toggle(ref, config, searched, candidate.id),
           ),
       ],
     );
@@ -265,29 +281,35 @@ class _ResultsState extends ConsumerState<_Results> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Padding(
-          padding: const EdgeInsets.all(4),
-          child: TextField(
-            autofocus: true,
-            onChanged: (text) => setState(() => _query = text),
-            style: const TextStyle(fontSize: 13),
-            decoration: const InputDecoration(
-              isDense: true,
-              prefixIcon: Icon(Icons.search, size: 16),
-              hintText: 'Rechercher une ligne',
-              border: OutlineInputBorder(),
-              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          padding: const EdgeInsets.only(bottom: 4),
+          child: SizedBox(
+            height: 32,
+            child: TextField(
+              autofocus: true,
+              onChanged: (text) => setState(() => _query = text),
+              style: const TextStyle(fontSize: 13),
+              textAlignVertical: TextAlignVertical.center,
+              decoration: const InputDecoration(
+                prefixIcon: AppIcon(AppIcons.search),
+                prefixIconConstraints: BoxConstraints(minWidth: 32),
+                hintText: 'Rechercher une ligne',
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+              ),
             ),
           ),
         ),
         if (found.isEmpty)
           Padding(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             child: Text(
               _query.trim().isEmpty
                   ? 'Aucune ligne à référencer dans la feuille liée pour '
                         'l\'instant.'
                   : 'Aucun résultat pour « ${_query.trim()} ».',
-              style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+              style: AppText.help,
             ),
           ),
         for (final candidate in found)
@@ -309,6 +331,24 @@ class _ResultsState extends ConsumerState<_Results> {
               if (!many) widget.close();
             },
           ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.textSubtle,
+                textStyle: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              onPressed: widget.close,
+              child: const Text('Fermer'),
+            ),
+          ),
+        ),
       ],
     );
   }

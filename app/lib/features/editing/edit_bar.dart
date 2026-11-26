@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
+import '../../shared/app_icons.dart';
+import '../../shared/controls.dart';
 import '../../shared/providers.dart';
 import '../../shared/segmented.dart';
 import '../grid/column_type_ui.dart';
@@ -116,59 +118,42 @@ class _EditBarState extends ConsumerState<EditBar> {
     final column = ref.watch(selectedColumnProvider);
     final calcColumn = ref.watch(calcColumnProvider);
 
-    const typeStyle = TextStyle(fontSize: 13, color: AppColors.textMuted);
     final Widget content;
     if (calcColumn != null && selection != null) {
       // Une case de calcul : en bas de la grille, ou sur une ligne de groupe.
       final bottom = selection is CalcCellSelected;
-      content = Row(
-        children: [
-          _Reference(
-            bottom
-                ? 'Calcul ${selection.index + 1} · ${calcColumn.label}'
-                : 'Calcul de groupe · ${calcColumn.label}',
-          ),
-          const SizedBox(width: 10),
-          const Icon(Icons.functions, size: 14, color: AppColors.textMuted),
-          const SizedBox(width: 6),
-          Text(
-            bottom ? 'Case de calcul' : 'Opération de groupe',
-            style: typeStyle,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: CalcEditor(column: calcColumn, selection: selection),
-          ),
-        ],
+      content = _Line(
+        reference: bottom
+            ? 'Calcul ${selection.index + 1} · ${calcColumn.label}'
+            : 'Calcul de groupe · ${calcColumn.label}',
+        icon: AppIcons.formula,
+        type: bottom ? 'Case de calcul' : 'Opération de groupe',
+        child: CalcEditor(column: calcColumn, selection: selection),
       );
     } else if (selection is ColumnSelected &&
         column != null &&
         column.type == ColumnType.formula) {
       // Une colonne Formule a une seule formule pour toutes ses lignes.
-      content = Row(
-        children: [
-          _Reference(columnTitle(column)),
-          const SizedBox(width: 10),
-          Icon(column.type.icon, size: 14, color: AppColors.textMuted),
-          const SizedBox(width: 6),
-          Text(column.type.label, style: typeStyle),
-          const SizedBox(width: 12),
-          Expanded(child: FormulaEditor(column: column)),
-        ],
+      content = _Line(
+        reference: columnTitle(column),
+        icon: column.type.icon,
+        type: column.type.label,
+        child: FormulaEditor(column: column),
       );
     } else if (selection is ColumnSelected && column != null) {
-      content = Row(
-        children: [
-          _Reference(columnTitle(column)),
-          const SizedBox(width: 12),
-          const Flexible(
-            child: Text(
-              'Colonne entière sélectionnée : les réglages de la barre de '
-              'style s\'appliquent à toutes ses cellules.',
-              style: TextStyle(fontSize: 13, color: AppColors.textSubtle),
-            ),
+      content = _Line(
+        reference: columnTitle(column),
+        icon: column.type.icon,
+        type: column.type.label,
+        child: const Text(
+          'Colonne entière sélectionnée : les réglages de la barre de '
+          'style s\'appliquent à toutes ses cellules.',
+          style: TextStyle(
+            fontSize: 13,
+            height: 1.4,
+            color: AppColors.textSubtle,
           ),
-        ],
+        ),
       );
     } else if (cell == null) {
       content = const Align(
@@ -188,38 +173,21 @@ class _EditBarState extends ConsumerState<EditBar> {
           // catégories, qui passe à la ligne, agrandit la barre.
           ConstrainedBox(
             constraints: const BoxConstraints(minHeight: _editorHeight),
-            child: Row(
-              children: [
-                _Reference('${cell.column.letter}${cell.row.position + 1}'),
-                const SizedBox(width: 10),
-                Icon(
-                  cell.column.type.icon,
-                  size: 14,
-                  color: AppColors.textMuted,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  cell.column.type.label,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(child: _editor(cell)),
-                // Une cellule calculée ne se vide pas.
-                if (cell.column.type != ColumnType.formula)
-                  IconButton(
-                    tooltip: 'Vider la cellule',
-                    iconSize: 16,
-                    visualDensity: VisualDensity.compact,
-                    icon: const Icon(Icons.close),
-                    color: AppColors.textSubtle,
-                    onPressed: () => ref
-                        .read(workbookServiceProvider)
-                        .setValue(cell.row, cell.column, null),
-                  ),
-              ],
+            child: _Line(
+              reference: '${cell.column.letter}${cell.row.position + 1}',
+              icon: cell.column.type.icon,
+              type: cell.column.type.label,
+              trailing: cell.column.type == ColumnType.formula
+                  // Une cellule calculée ne se vide pas.
+                  ? null
+                  : IconBtn(
+                      tooltip: 'Vider la cellule',
+                      icon: AppIcons.close,
+                      onPressed: () => ref
+                          .read(workbookServiceProvider)
+                          .setValue(cell.row, cell.column, null),
+                    ),
+              child: _editor(cell),
             ),
           ),
           if (_error case final error?)
@@ -229,8 +197,8 @@ class _EditBarState extends ConsumerState<EditBar> {
                 liveRegion: true,
                 child: Row(
                   children: [
-                    const Icon(
-                      Icons.error_outline,
+                    const AppIcon(
+                      AppIcons.error,
                       size: 14,
                       color: AppColors.danger,
                     ),
@@ -252,12 +220,14 @@ class _EditBarState extends ConsumerState<EditBar> {
 
     return Container(
       // + 1 pour la bordure : la barre a la même hauteur vide ou remplie.
+      // 32 px de champ, 8 px de marge en haut et en bas, 1 px de bordure.
       constraints: const BoxConstraints(minHeight: AppSizes.barHeight + 1),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: const BoxDecoration(
         color: AppColors.surface,
         border: Border(bottom: BorderSide(color: AppColors.headerLine)),
       ),
+      alignment: Alignment.centerLeft,
       child: content,
     );
   }
@@ -278,6 +248,8 @@ class _EditBarState extends ConsumerState<EditBar> {
             selected: value is BoolValue && value.value,
             onSelected: (next) =>
                 service.setValue(cell.row, cell.column, BoolValue(next)),
+            padding: 14,
+            minSegmentWidth: 64,
             options: const [
               (value: true, label: 'Vrai', icon: null),
               (value: false, label: 'Faux', icon: null),
@@ -297,22 +269,40 @@ class _EditBarState extends ConsumerState<EditBar> {
         final number = value is NumberValue ? value.number : 0.0;
         return Row(
           children: [
-            _Step(
+            IconBtn(
               tooltip: 'Diminuer de 1',
-              icon: Icons.remove,
-              onTap: () => service.setValue(
+              icon: AppIcons.minus,
+              iconSize: 14,
+              bordered: true,
+              onPressed: () => service.setValue(
                 cell.row,
                 cell.column,
                 NumberValue(number - 1),
               ),
             ),
             const SizedBox(width: 4),
-            SizedBox(width: 200, child: _textField(cell)),
+            SizedBox(width: 180, child: _textField(cell)),
+            if (cell.column.type == ColumnType.percent) ...[
+              const SizedBox(width: 4),
+              const Padding(
+                padding: EdgeInsets.only(left: 2, right: 4),
+                child: Text(
+                  '%',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSubtle,
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(width: 4),
-            _Step(
+            IconBtn(
               tooltip: 'Augmenter de 1',
-              icon: Icons.add,
-              onTap: () => service.setValue(
+              icon: AppIcons.plus,
+              iconSize: 14,
+              bordered: true,
+              onPressed: () => service.setValue(
                 cell.row,
                 cell.column,
                 NumberValue(number + 1),
@@ -324,32 +314,25 @@ class _EditBarState extends ConsumerState<EditBar> {
       case ColumnType.date:
         return Row(
           children: [
-            SizedBox(width: 180, child: _textField(cell)),
-            IconButton(
-              tooltip: 'Choisir une date',
-              iconSize: 16,
-              visualDensity: VisualDensity.compact,
-              icon: const Icon(Icons.calendar_month_outlined),
-              onPressed: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: value is DateValue ? value.date : DateTime.now(),
-                  firstDate: DateTime(1900),
-                  lastDate: DateTime(2200),
-                );
-                if (picked != null) {
-                  await service.setValue(
-                    cell.row,
-                    cell.column,
-                    DateValue.fromDateTime(picked),
-                  );
-                }
-              },
+            SizedBox(
+              width: 180,
+              child: _textField(
+                cell,
+                // Le bouton du calendrier est dans le champ, comme celui
+                // d'un champ date de navigateur.
+                suffix: IconBtn(
+                  tooltip: 'Choisir une date',
+                  icon: AppIcons.calendar,
+                  iconSize: 14,
+                  size: 28,
+                  onPressed: () => _pickDate(cell, value),
+                ),
+              ),
             ),
+            const SizedBox(width: 6),
             TextButton(
               style: TextButton.styleFrom(
                 minimumSize: const Size(0, _editorHeight),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
               onPressed: () => service.setValue(
                 cell.row,
@@ -364,7 +347,7 @@ class _EditBarState extends ConsumerState<EditBar> {
       case ColumnType.duration:
         return Align(
           alignment: Alignment.centerLeft,
-          child: SizedBox(width: 200, child: _textField(cell)),
+          child: SizedBox(width: 180, child: _textField(cell)),
         );
 
       case ColumnType.text:
@@ -372,32 +355,54 @@ class _EditBarState extends ConsumerState<EditBar> {
     }
   }
 
-  Widget _textField(SelectedCell cell) {
+  Future<void> _pickDate(SelectedCell cell, CellValue? value) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: value is DateValue ? value.date : DateTime.now(),
+      firstDate: DateTime(1900),
+      lastDate: DateTime(2200),
+    );
+    if (picked != null) {
+      await ref
+          .read(workbookServiceProvider)
+          .setValue(cell.row, cell.column, DateValue.fromDateTime(picked));
+    }
+  }
+
+  Widget _textField(SelectedCell cell, {Widget? suffix}) {
     final type = cell.column.type;
     final alignRight = defaultAlignment(type) == TextAlignment.right;
-    return TextField(
-      controller: _controller,
-      focusNode: _focusNode,
-      style: const TextStyle(fontSize: 13),
-      textAlign: alignRight ? TextAlign.right : TextAlign.left,
-      decoration: InputDecoration(
-        isDense: true,
-        hintText: _hint(type),
-        border: const OutlineInputBorder(),
-        enabledBorder: _error == null
-            ? null
-            : const OutlineInputBorder(
-                borderSide: BorderSide(color: AppColors.danger),
-              ),
-        focusedBorder: _error == null
-            ? null
-            : const OutlineInputBorder(
-                borderSide: BorderSide(color: AppColors.danger, width: 2),
-              ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        suffixText: type == ColumnType.percent ? '%' : null,
+    return SizedBox(
+      height: _editorHeight,
+      child: TextField(
+        controller: _controller,
+        focusNode: _focusNode,
+        style: const TextStyle(fontSize: 13),
+        textAlignVertical: TextAlignVertical.center,
+        textAlign: alignRight ? TextAlign.right : TextAlign.left,
+        decoration: InputDecoration(
+          hintText: _hint(type),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 10,
+            vertical: 6,
+          ),
+          enabledBorder: _error == null
+              ? null
+              : fieldBorder(color: AppColors.danger),
+          focusedBorder: _error == null
+              ? null
+              : OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: const BorderSide(
+                    color: AppColors.danger,
+                    width: 2,
+                  ),
+                ),
+          suffixIcon: suffix,
+          suffixIconConstraints: const BoxConstraints(minWidth: 32),
+        ),
+        onSubmitted: (_) => _submit(cell),
       ),
-      onSubmitted: (_) => _submit(cell),
     );
   }
 
@@ -426,7 +431,7 @@ class _EditBarState extends ConsumerState<EditBar> {
         if (all.isEmpty)
           const Text(
             'Aucune catégorie dans cette colonne pour l\'instant.',
-            style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+            style: AppText.help,
           ),
         for (final category in all)
           _CategoryToggle(
@@ -438,27 +443,51 @@ class _EditBarState extends ConsumerState<EditBar> {
           ),
         SizedBox(
           width: 170,
+          height: 28,
           child: TextField(
             controller: _categoryController,
             focusNode: _categoryFocus,
             style: const TextStyle(fontSize: 13),
-            decoration: const InputDecoration(
-              isDense: true,
+            textAlignVertical: TextAlignVertical.center,
+            decoration: InputDecoration(
               hintText: 'Nouvelle catégorie',
-              border: OutlineInputBorder(),
-              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 4,
+              ),
+              enabledBorder: _pill(AppColors.fieldBorder),
+              border: _pill(AppColors.fieldBorder),
+              focusedBorder: _pill(AppColors.accent, width: 2),
             ),
             onSubmitted: (_) => add(),
           ),
         ),
-        TextButton.icon(
+        TextButton(
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.only(left: 8, right: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
           onPressed: add,
-          icon: const Icon(Icons.add, size: 14),
-          label: const Text('Ajouter'),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppIcon(AppIcons.plus, size: 14, color: AppColors.accent),
+              SizedBox(width: 6),
+              Text('Ajouter'),
+            ],
+          ),
         ),
       ],
     );
   }
+
+  static OutlineInputBorder _pill(Color color, {double width = 1}) =>
+      OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: color, width: width),
+      );
 
   static String _hint(ColumnType type) => switch (type) {
     ColumnType.text => 'Saisir un texte',
@@ -507,30 +536,43 @@ class _Reference extends StatelessWidget {
   }
 }
 
-class _Step extends StatelessWidget {
-  const _Step({required this.tooltip, required this.icon, required this.onTap});
+/// Une ligne de la barre d'édition : référence, type, trait, éditeur et
+/// action éventuelle à droite, espacés de 10 px comme dans la maquette.
+class _Line extends StatelessWidget {
+  const _Line({
+    required this.reference,
+    required this.icon,
+    required this.type,
+    required this.child,
+    this.trailing,
+  });
 
-  final String tooltip;
-  final IconData icon;
-  final VoidCallback onTap;
+  final String reference;
+  final AppIconData icon;
+  final String type;
+  final Widget child;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(6),
-        child: Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.fieldBorder),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Icon(icon, size: 14, color: AppColors.textSubtle),
+    return Row(
+      children: [
+        _Reference(reference),
+        const SizedBox(width: 10),
+        AppIcon(icon, size: 14, color: AppColors.textMuted),
+        const SizedBox(width: 6),
+        Text(
+          type,
+          style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
         ),
-      ),
+        const SizedBox(width: 10),
+        const VSeparator(),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Align(alignment: Alignment.centerLeft, child: child),
+        ),
+        if (trailing case final action?) ...[const SizedBox(width: 10), action],
+      ],
     );
   }
 }
@@ -553,35 +595,37 @@ class _CategoryToggle extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          height: 28,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            color: selected ? AppColors.accentTint : AppColors.surface,
-            border: Border.all(
-              color: selected ? AppColors.accent : AppColors.fieldBorder,
-            ),
-            borderRadius: BorderRadius.circular(14),
+      child: Material(
+        color: selected ? AppColors.accentTint : AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(
+            color: selected ? AppColors.accent : AppColors.fieldBorder,
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (selected) ...[
-                Icon(Icons.check, size: 14, color: color),
-                const SizedBox(width: 4),
-              ],
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: color,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+        ),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            height: AppSizes.smallControl,
+            padding: EdgeInsets.only(left: selected ? 8 : 12, right: 12),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (selected) ...[
+                  AppIcon(AppIcons.check, size: 14, color: color),
+                  const SizedBox(width: 6),
+                ],
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: color,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

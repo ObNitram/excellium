@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
+import '../../shared/app_icons.dart';
+import '../../shared/controls.dart';
 import '../../shared/providers.dart';
 import '../../shared/segmented.dart';
 import '../grid/column_type_ui.dart';
@@ -23,12 +25,13 @@ class StyleBar extends ConsumerWidget {
     final selection = ref.watch(selectionProvider);
 
     return Container(
-      // + 1 pour la bordure : la barre a la même hauteur vide ou remplie.
-      constraints: const BoxConstraints(minHeight: AppSizes.barHeight + 1),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      // 32 px de boutons, 6 px de marge en haut et en bas, 1 px de bordure :
+      // la barre a la même hauteur vide ou remplie.
+      constraints: const BoxConstraints(minHeight: AppSizes.control + 13),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: const BoxDecoration(
         color: AppColors.surface,
-        border: Border(bottom: BorderSide(color: AppColors.gridLine)),
+        border: Border(bottom: BorderSide(color: AppColors.headerLine)),
       ),
       alignment: Alignment.centerLeft,
       child: column == null || (selection is CellSelected && cell == null)
@@ -67,157 +70,143 @@ class _Controls extends ConsumerWidget {
         type.hasTextStyle ||
         (type == ColumnType.boolean && style.boolDisplay == BoolDisplay.text);
 
-    return Wrap(
-      spacing: 10,
-      runSpacing: 6,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        _Target(
-          label: row == null
-              ? columnTitle(column)
-              : '${column.letter}${row!.position + 1}',
-          wholeColumn: row == null,
-        ),
-        if (type == ColumnType.boolean)
-          _Labelled(
-            label: 'Affichage',
-            child: Segmented<BoolDisplay>(
-              selected: style.boolDisplay,
-              onSelected: (value) => apply(CellStyle(boolDisplay: value)),
-              options: const [
-                (
-                  value: BoolDisplay.checkbox,
-                  label: 'Case à cocher',
-                  icon: Icons.check_box_outlined,
-                ),
-                (
-                  value: BoolDisplay.toggle,
-                  label: 'Interrupteur',
-                  icon: Icons.toggle_on_outlined,
-                ),
-                (
-                  value: BoolDisplay.text,
-                  label: 'Vrai / Faux',
-                  icon: Icons.title,
-                ),
-              ],
-            ),
-          ),
-        if (type == ColumnType.percent)
-          _Labelled(
-            label: 'Affichage',
-            child: Segmented<PercentDisplay>(
-              selected: style.percentDisplay,
-              onSelected: (value) => apply(CellStyle(percentDisplay: value)),
-              options: const [
-                (
-                  value: PercentDisplay.value,
-                  label: 'Valeur',
-                  icon: Icons.percent,
-                ),
-                (
-                  value: PercentDisplay.bar,
-                  label: 'Barre de progression',
-                  icon: Icons.linear_scale,
-                ),
-              ],
-            ),
-          ),
-        if (textStyle)
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _Toggle(
-                tooltip: 'Gras',
-                icon: Icons.format_bold,
-                on: style.bold,
-                onTap: () => apply(CellStyle(bold: !style.bold)),
+    final groups = <Widget>[
+      if (type == ColumnType.percent)
+        _Labelled(
+          label: 'Affichage',
+          child: Segmented<PercentDisplay>(
+            selected: style.percentDisplay,
+            onSelected: (value) => apply(CellStyle(percentDisplay: value)),
+            options: const [
+              (
+                value: PercentDisplay.value,
+                label: 'Valeur',
+                icon: AppIcons.percent,
               ),
-              _Toggle(
-                tooltip: 'Italique',
-                icon: Icons.format_italic,
-                on: style.italic,
-                onTap: () => apply(CellStyle(italic: !style.italic)),
-              ),
-              _Toggle(
-                tooltip: 'Souligné',
-                icon: Icons.format_underlined,
-                on: style.underline,
-                onTap: () => apply(CellStyle(underline: !style.underline)),
+              (
+                value: PercentDisplay.bar,
+                label: 'Barre de progression',
+                icon: AppIcons.progressBar,
               ),
             ],
           ),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _Toggle(
-              tooltip: 'Aligner à gauche',
-              icon: Icons.format_align_left,
-              on: style.align == TextAlignment.left,
-              onTap: () => apply(const CellStyle(align: TextAlignment.left)),
-            ),
-            _Toggle(
-              tooltip: 'Centrer',
-              icon: Icons.format_align_center,
-              on: style.align == TextAlignment.center,
-              onTap: () => apply(const CellStyle(align: TextAlignment.center)),
-            ),
-            _Toggle(
-              tooltip: 'Aligner à droite',
-              icon: Icons.format_align_right,
-              on: style.align == TextAlignment.right,
-              onTap: () => apply(const CellStyle(align: TextAlignment.right)),
-            ),
-          ],
         ),
+      if (type == ColumnType.boolean)
+        _Labelled(
+          label: 'Affichage',
+          child: Segmented<BoolDisplay>(
+            selected: style.boolDisplay,
+            onSelected: (value) => apply(CellStyle(boolDisplay: value)),
+            options: const [
+              (
+                value: BoolDisplay.checkbox,
+                label: 'Case à cocher',
+                icon: AppIcons.boolean,
+              ),
+              (
+                value: BoolDisplay.toggle,
+                label: 'Interrupteur',
+                icon: AppIcons.toggle,
+              ),
+              (
+                value: BoolDisplay.text,
+                label: 'Vrai / Faux',
+                icon: AppIcons.text,
+              ),
+            ],
+          ),
+        ),
+      if (textStyle)
+        _Buttons([
+          IconBtn(
+            tooltip: 'Gras',
+            on: style.bold,
+            onPressed: () => apply(CellStyle(bold: !style.bold)),
+            child: const Text(
+              'G',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+            ),
+          ),
+          IconBtn(
+            tooltip: 'Italique',
+            on: style.italic,
+            onPressed: () => apply(CellStyle(italic: !style.italic)),
+            child: const Text(
+              'I',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+          IconBtn(
+            tooltip: 'Souligné',
+            on: style.underline,
+            onPressed: () => apply(CellStyle(underline: !style.underline)),
+            child: const Text(
+              'S',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ),
+        ]),
+      _Buttons([
+        IconBtn(
+          tooltip: 'Aligner à gauche',
+          icon: AppIcons.alignLeft,
+          on: style.align == TextAlignment.left,
+          onPressed: () => apply(const CellStyle(align: TextAlignment.left)),
+        ),
+        IconBtn(
+          tooltip: 'Centrer',
+          icon: AppIcons.alignCenter,
+          on: style.align == TextAlignment.center,
+          onPressed: () => apply(const CellStyle(align: TextAlignment.center)),
+        ),
+        IconBtn(
+          tooltip: 'Aligner à droite',
+          icon: AppIcons.alignRight,
+          on: style.align == TextAlignment.right,
+          onPressed: () => apply(const CellStyle(align: TextAlignment.right)),
+        ),
+      ]),
+    ];
+
+    // Les groupes sont séparés par un trait vertical, comme dans la maquette.
+    return Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        for (final (index, group) in groups.indexed) ...[
+          if (index > 0) const VSeparator(),
+          group,
+        ],
       ],
     );
   }
 }
 
-/// Rappelle sur quoi porte le style : une cellule ou toute une colonne.
-class _Target extends StatelessWidget {
-  const _Target({required this.label, required this.wholeColumn});
+/// Boutons d'un même groupe, espacés de 2 px.
+class _Buttons extends StatelessWidget {
+  const _Buttons(this.buttons);
 
-  final String label;
-  final bool wholeColumn;
+  final List<Widget> buttons;
 
   @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: wholeColumn
-          ? 'Le style s\'applique à toute la colonne'
-          : 'Le style s\'applique à cette cellule',
-      child: Container(
-        key: const Key('style-target'),
-        height: 28,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          color: AppColors.accentTint,
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              wholeColumn ? Icons.view_column_outlined : Icons.crop_din,
-              size: 14,
-              color: AppColors.accent,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppColors.accent,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      for (final (index, button) in buttons.indexed) ...[
+        if (index > 0) const SizedBox(width: 2),
+        button,
+      ],
+    ],
+  );
 }
 
 class _Labelled extends StatelessWidget {
@@ -238,49 +227,6 @@ class _Labelled extends StatelessWidget {
         const SizedBox(width: 8),
         child,
       ],
-    );
-  }
-}
-
-class _Toggle extends StatelessWidget {
-  const _Toggle({
-    required this.tooltip,
-    required this.icon,
-    required this.on,
-    required this.onTap,
-  });
-
-  final String tooltip;
-  final IconData icon;
-  final bool on;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Semantics(
-        button: true,
-        toggled: on,
-        label: tooltip,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(6),
-          child: Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: on ? AppColors.accentTint : null,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Icon(
-              icon,
-              size: 18,
-              color: on ? AppColors.accent : AppColors.textSubtle,
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
