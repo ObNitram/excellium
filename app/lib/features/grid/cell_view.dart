@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
 import '../../shared/providers.dart';
+import '../formulas/formula_text.dart';
 import 'cell_format.dart';
 import 'grid_providers.dart';
 
@@ -135,6 +136,20 @@ class CellView extends ConsumerWidget {
             ? value.rowIds
             : value.rowIds.take(1);
         return _chips([for (final id in ids) labels[id] ?? 'Ligne supprimée']);
+
+      case ColumnType.formula:
+        // Valeur calculée ; une ligne vide n'en a pas.
+        final computed = ref.watch(sheetFormulasProvider(row.sheetId));
+        final values = computed.column(column.id);
+        if (values.hasError) {
+          return row.isEmpty
+              ? const SizedBox.shrink()
+              : _text(formulaErrorMark, style, color: AppColors.danger);
+        }
+        final number = values.values[row.id];
+        return number == null
+            ? const SizedBox.shrink()
+            : _text(formulaValueText(number, values.unit), style);
 
       case ColumnType.text:
       case ColumnType.number:

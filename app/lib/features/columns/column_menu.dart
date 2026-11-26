@@ -114,6 +114,25 @@ class _ColumnMenuState extends ConsumerState<ColumnMenu> {
             widget.close();
           },
         ),
+        if (canGroupBy(column.type))
+          spec.groupBy == column.id
+              ? PanelItem(
+                  icon: Icons.table_rows_outlined,
+                  label: 'Ne plus regrouper',
+                  selected: true,
+                  onTap: () {
+                    view.setGroupBy(null);
+                    widget.close();
+                  },
+                )
+              : PanelItem(
+                  icon: Icons.table_rows_outlined,
+                  label: 'Regrouper par cette colonne',
+                  onTap: () {
+                    view.setGroupBy(column.id);
+                    widget.close();
+                  },
+                ),
         if (column.type == ColumnType.singleCategory)
           PanelItem(
             icon: Icons.view_kanban_outlined,
@@ -150,7 +169,13 @@ class _ColumnMenuState extends ConsumerState<ColumnMenu> {
               label: type.label,
               selected: type == column.type,
               onTap: () async {
+                final selection = ref.read(selectionProvider.notifier);
                 await service.changeColumnType(column, type);
+                // Une formule se saisit dans la barre d'édition : la colonne
+                // est sélectionnée pour l'écrire tout de suite.
+                if (type == ColumnType.formula) {
+                  selection.selectColumn(column.id);
+                }
                 // Une référence se paramètre aussitôt : on laisse le menu
                 // ouvert.
                 if (type != ColumnType.reference) widget.close();

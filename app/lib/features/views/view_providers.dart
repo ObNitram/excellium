@@ -68,6 +68,11 @@ class ViewSpecNotifier extends Notifier<ViewSpec> {
 
   void showAllColumns() => state = state.copyWith(hiddenColumnIds: const []);
 
+  /// Regroupe les lignes selon une colonne ; `null` retire le regroupement.
+  void setGroupBy(ColumnId? columnId) => state = columnId == null
+      ? state.copyWith(clearGroupBy: true)
+      : state.copyWith(groupBy: columnId);
+
   /// Retire toute mention d'une colonne supprimée : tri, filtre, masquage,
   /// clé d'affichage.
   void forgetColumn(ColumnId columnId) => state = state.withoutColumn(columnId);
@@ -130,8 +135,77 @@ final visibleRowsProvider = Provider.family<List<SheetRow>, SheetId>((
       label = (id) => labels[id] ?? '';
     }
   }
-  return applyRowQuery(rows, columns, query, referenceLabel: label);
+  // Une colonne Formule se trie et se filtre sur ses valeurs calculées.
+  final formulas = ref.watch(sheetFormulasProvider(sheetId));
+  return applyRowQuery(
+    rows,
+    columns,
+    query,
+    referenceLabel: label,
+    computed: (row, column) => formulas.valueAt(column, row),
+  );
 });
+
+/// La colonne selon laquelle la grille est regroupée, si la vue en demande
+/// une et qu'elle s'y prête (Catégorie ou Référence, affichage Grille).
+final groupColumnProvider = Provider.family<ColumnDef?, SheetId>((
+  ref,
+  sheetId,
+) {
+  final spec = ref.watch(viewSpecProvider(sheetId));
+  if (spec.layout.kind != LayoutKind.grid || spec.groupBy == null) return null;
+  final columns = ref.watch(columnsProvider(sheetId)).value ?? const [];
+  for (final column in columns) {
+    if (column.id == spec.groupBy && canGroupBy(column.type)) return column;
+  }
+  return null;
+});
+
+/// Les groupes de la grille, ou `null` sans regroupement.
+final rowGroupsProvider = Provider.family<List<RowGroup>?, SheetId>((
+  ref,
+  sheetId,
+) {
+  final column = ref.watch(groupColumnProvider(sheetId));
+  if (column == null) return null;
+  final target = column.reference?.targetSheetId;
+  return groupRows(
+    column: column,
+    shown: ref.watch(visibleRowsProvider(sheetId)),
+    all: ref.watch(rowsProvider(sheetId)).value ?? const [],
+    // Les groupes d'une référence suivent l'ordre de la feuille liée.
+    referenceOrder: target == null
+        ? const []
+        : [
+            for (final row
+                in ref.watch(rowsProvider(target)).value ?? const <SheetRow>[])
+              row.id,
+          ],
+    hideEmpty: ref.watch(
+      viewSpecProvider(sheetId)
+          .select((spec) => spec.query.activeFilters.isNotEmpty),
+    ),
+  );
+});
+
+/// Les groupes repliés, par colonne et clé de groupe. État d'affichage, gardé
+/// le temps de la session.
+final collapsedGroupsProvider = NotifierProvider<CollapsedGroups, Set<String>>(
+  CollapsedGroups.new,
+);
+
+class CollapsedGroups extends Notifier<Set<String>> {
+  @override
+  Set<String> build() => const {};
+
+  static String idOf(ColumnDef column, RowGroup group) =>
+      '${column.id.value}|${group.key}';
+
+  void toggle(ColumnDef column, RowGroup group) {
+    final id = idOf(column, group);
+    state = state.contains(id) ? ({...state}..remove(id)) : {...state, id};
+  }
+}
 
 /// La colonne qui sert de clé à l'affichage en cours : étapes d'un kanban ou
 /// date d'un calendrier. À défaut de choix valide, la première colonne du bon

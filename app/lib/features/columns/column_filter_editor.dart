@@ -37,6 +37,7 @@ class ColumnFilterEditor extends ConsumerWidget {
 
       case ColumnType.number:
       case ColumnType.percent:
+      case ColumnType.formula:
         final range = filter is NumberRange ? filter : const NumberRange();
         return Row(
           children: [

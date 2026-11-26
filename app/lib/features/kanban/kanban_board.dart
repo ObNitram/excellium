@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/theme.dart';
 import '../../shared/drag_data.dart';
 import '../../shared/providers.dart';
+import '../formulas/formula_text.dart';
 import '../grid/cell_format.dart';
 import '../grid/column_type_ui.dart';
 import '../grid/grid_providers.dart';
@@ -184,6 +185,20 @@ class KanbanBoard extends ConsumerWidget {
     final fields = <({IconData icon, String text})>[];
     for (final column in columns) {
       if (fields.length >= 4) break;
+      if (column.type == ColumnType.formula) {
+        final computed = ref
+            .watch(sheetFormulasProvider(row.sheetId))
+            .column(column.id);
+        final number = computed.values[row.id];
+        if (number == null) continue;
+        final name = column.name.trim();
+        final text = formulaValueText(number, computed.unit);
+        fields.add((
+          icon: column.type.icon,
+          text: name.isEmpty ? text : '$name : $text',
+        ));
+        continue;
+      }
       final value = row[column.id];
       if (value == null || (value is BoolValue && !value.value)) continue;
       var text = formatCell(value, column.type);

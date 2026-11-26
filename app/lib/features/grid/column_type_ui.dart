@@ -13,6 +13,7 @@ extension ColumnTypeUi on ColumnType {
     ColumnType.multiCategory => 'Catégorie multiple',
     ColumnType.boolean => 'Booléen',
     ColumnType.reference => 'Référence',
+    ColumnType.formula => 'Formule',
   };
 
   IconData get icon => switch (this) {
@@ -25,6 +26,7 @@ extension ColumnTypeUi on ColumnType {
     ColumnType.multiCategory => Icons.label_important_outline,
     ColumnType.boolean => Icons.check_box_outlined,
     ColumnType.reference => Icons.link,
+    ColumnType.formula => Icons.functions,
   };
 
   bool get isCategory =>
@@ -37,7 +39,8 @@ extension ColumnTypeUi on ColumnType {
     ColumnType.number ||
     ColumnType.percent ||
     ColumnType.date ||
-    ColumnType.duration => true,
+    ColumnType.duration ||
+    ColumnType.formula => true,
     _ => false,
   };
 }

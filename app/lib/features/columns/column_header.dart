@@ -155,6 +155,13 @@ class _ColumnHeaderState extends ConsumerState<ColumnHeader> {
                                   color: AppColors.accent,
                                   semanticLabel: 'Colonne triée',
                                 ),
+                              if (spec.groupBy == column.id)
+                                const Icon(
+                                  Icons.table_rows_outlined,
+                                  size: 12,
+                                  color: AppColors.accent,
+                                  semanticLabel: 'Colonne de regroupement',
+                                ),
                               if (filtered)
                                 const Icon(
                                   Icons.filter_alt,

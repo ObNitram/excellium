@@ -50,63 +50,71 @@ class _PopoverState extends State<Popover> {
       link: _link,
       child: OverlayPortal(
         controller: _controller,
-        overlayChildBuilder: (context) => Stack(
-          children: [
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: _close,
-                child: const SizedBox.expand(),
+        overlayChildBuilder: (overlayContext) {
+          // Près du bord droit de la fenêtre, le panneau s'aligne sur la
+          // droite du bouton pour rester entièrement visible.
+          final box = context.findRenderObject();
+          final left = box is RenderBox && box.hasSize
+              ? box.localToGlobal(Offset.zero).dx
+              : 0.0;
+          final toLeft =
+              left + widget.width > MediaQuery.sizeOf(overlayContext).width - 8;
+          final vertical = widget.above ? 1.0 : -1.0;
+          final horizontal = toLeft ? 1.0 : -1.0;
+          return Stack(
+            children: [
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _close,
+                  child: const SizedBox.expand(),
+                ),
               ),
-            ),
-            CompositedTransformFollower(
-              link: _link,
-              targetAnchor: widget.above
-                  ? Alignment.topLeft
-                  : Alignment.bottomLeft,
-              followerAnchor: widget.above
-                  ? Alignment.bottomLeft
-                  : Alignment.topLeft,
-              offset: Offset(0, widget.above ? -4 : 4),
-              child: Align(
-                alignment: widget.above
-                    ? Alignment.bottomLeft
-                    : Alignment.topLeft,
-                child: CallbackShortcuts(
-                  bindings: {
-                    const SingleActivator(LogicalKeyboardKey.escape): _close,
-                  },
-                  // Le panneau prend le focus à l'ouverture : Échap le ferme
-                  // même s'il ne contient aucun champ de saisie.
-                  child: FocusScope(
-                    autofocus: true,
-                    child: Material(
-                      key: const Key('popover-panel'),
-                      elevation: 8,
-                      color: AppColors.surface,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        side: const BorderSide(color: AppColors.headerLine),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          minWidth: widget.width,
-                          maxWidth: widget.width,
-                          maxHeight: 520,
+              CompositedTransformFollower(
+                link: _link,
+                // Au-dessus : bas du panneau sur le haut du bouton ; sinon
+                // haut du panneau sous le bouton.
+                targetAnchor: Alignment(horizontal, -vertical),
+                followerAnchor: Alignment(horizontal, vertical),
+                offset: Offset(0, widget.above ? -4 : 4),
+                child: Align(
+                  alignment: Alignment(horizontal, vertical),
+                  child: CallbackShortcuts(
+                    bindings: {
+                      const SingleActivator(LogicalKeyboardKey.escape): _close,
+                    },
+                    // Le panneau prend le focus à l'ouverture : Échap le ferme
+                    // même s'il ne contient aucun champ de saisie.
+                    child: FocusScope(
+                      autofocus: true,
+                      child: Material(
+                        key: const Key('popover-panel'),
+                        elevation: 8,
+                        color: AppColors.surface,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: const BorderSide(color: AppColors.headerLine),
                         ),
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.all(6),
-                          child: widget.panelBuilder(context, _close),
+                        clipBehavior: Clip.antiAlias,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minWidth: widget.width,
+                            maxWidth: widget.width,
+                            maxHeight: 520,
+                          ),
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(6),
+                            child: widget.panelBuilder(overlayContext, _close),
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
+            ],
+          );
+        },
         child: widget.anchorBuilder(context, _toggle, _controller.isShowing),
       ),
     );

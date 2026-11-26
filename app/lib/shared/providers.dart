@@ -11,6 +11,14 @@ final storeProvider = Provider<ExcelliumStore>(
   ),
 );
 
+/// Le moteur de formules, vu à travers son interface. Fourni au démarrage,
+/// comme le stockage.
+final formulaEngineProvider = Provider<FormulaEngine>(
+  (ref) => throw UnimplementedError(
+    'formulaEngineProvider doit être surchargé au démarrage de l\'application.',
+  ),
+);
+
 /// Les cas d'usage du classeur.
 final workbookServiceProvider = Provider<WorkbookService>(
   (ref) => WorkbookService(ref.watch(storeProvider)),

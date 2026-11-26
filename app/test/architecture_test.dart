@@ -12,9 +12,11 @@ void main() {
     'package:drift_flutter/',
     'package:excellium_storage_drift/',
     'package:sqlite3/',
+    // Le moteur de formules se remplace de la même façon.
+    'package:excellium_formula/',
   ];
 
-  test('seul lib/bootstrap/ importe le moteur de stockage', () {
+  test('seul lib/bootstrap/ importe les moteurs concrets', () {
     final offenders = <String>[];
     final files = Directory('lib')
         .listSync(recursive: true)
@@ -45,5 +47,6 @@ void main() {
         .where((file) => !file.path.startsWith('lib/bootstrap/'));
     expect(checked.length, greaterThan(5));
     expect(File('lib/bootstrap/storage.dart').existsSync(), isTrue);
+    expect(File('lib/bootstrap/formulas.dart').existsSync(), isTrue);
   });
 }

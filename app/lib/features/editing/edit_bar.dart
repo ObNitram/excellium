@@ -8,6 +8,7 @@ import '../../shared/segmented.dart';
 import '../grid/column_type_ui.dart';
 import '../grid/grid_providers.dart';
 import '../views/view_providers.dart';
+import 'calc_editor.dart';
 import 'reference_picker.dart';
 
 /// Barre d'édition : remplit la cellule sélectionnée avec l'éditeur adapté au
@@ -72,9 +73,49 @@ class _EditBarState extends ConsumerState<EditBar> {
     final cell = ref.watch(selectedCellProvider);
     final selection = ref.watch(selectionProvider);
     final column = ref.watch(selectedColumnProvider);
+    final calcColumn = ref.watch(calcColumnProvider);
 
+    const typeStyle = TextStyle(fontSize: 13, color: AppColors.textMuted);
     final Widget content;
-    if (selection is ColumnSelected && column != null) {
+    if (calcColumn != null && selection != null) {
+      // Une case de calcul : en bas de la grille, ou sur une ligne de groupe.
+      final bottom = selection is CalcCellSelected;
+      content = Row(
+        children: [
+          _Reference(
+            bottom
+                ? 'Calcul ${selection.index + 1} · ${calcColumn.label}'
+                : 'Calcul de groupe · ${calcColumn.label}',
+          ),
+          const SizedBox(width: 10),
+          const Icon(Icons.functions, size: 14, color: AppColors.textMuted),
+          const SizedBox(width: 6),
+          Text(
+            bottom ? 'Case de calcul' : 'Opération de groupe',
+            style: typeStyle,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: CalcEditor(column: calcColumn, selection: selection),
+          ),
+        ],
+      );
+    } else if (selection is ColumnSelected &&
+        column != null &&
+        column.type == ColumnType.formula) {
+      // Une colonne Formule a une seule formule pour toutes ses lignes.
+      content = Row(
+        children: [
+          _Reference(columnTitle(column)),
+          const SizedBox(width: 10),
+          Icon(column.type.icon, size: 14, color: AppColors.textMuted),
+          const SizedBox(width: 6),
+          Text(column.type.label, style: typeStyle),
+          const SizedBox(width: 12),
+          Expanded(child: FormulaEditor(column: column)),
+        ],
+      );
+    } else if (selection is ColumnSelected && column != null) {
       content = Row(
         children: [
           _Reference(columnTitle(column)),
@@ -125,16 +166,18 @@ class _EditBarState extends ConsumerState<EditBar> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(child: _editor(cell)),
-                IconButton(
-                  tooltip: 'Vider la cellule',
-                  iconSize: 16,
-                  visualDensity: VisualDensity.compact,
-                  icon: const Icon(Icons.close),
-                  color: AppColors.textSubtle,
-                  onPressed: () => ref
-                      .read(workbookServiceProvider)
-                      .setValue(cell.row, cell.column, null),
-                ),
+                // Une cellule calculée ne se vide pas.
+                if (cell.column.type != ColumnType.formula)
+                  IconButton(
+                    tooltip: 'Vider la cellule',
+                    iconSize: 16,
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.close),
+                    color: AppColors.textSubtle,
+                    onPressed: () => ref
+                        .read(workbookServiceProvider)
+                        .setValue(cell.row, cell.column, null),
+                  ),
               ],
             ),
           ),
@@ -184,6 +227,9 @@ class _EditBarState extends ConsumerState<EditBar> {
     final service = ref.read(workbookServiceProvider);
     final value = cell.row[cell.column.id];
     switch (cell.column.type) {
+      case ColumnType.formula:
+        return FormulaEditor(column: cell.column);
+
       case ColumnType.boolean:
         return Align(
           alignment: Alignment.centerLeft,

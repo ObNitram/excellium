@@ -25,8 +25,8 @@ final rowLabelsProvider = Provider.family<Map<RowId, String>, SheetId>((
   return {for (final row in rows) row.id: rowLabel(row, columns)};
 });
 
-/// Ce qui est sélectionné dans la feuille : une cellule ou une colonne
-/// entière.
+/// Ce qui est sélectionné dans la feuille : une cellule, une colonne entière
+/// ou une case de calcul.
 sealed class GridSelection {
   const GridSelection(this.columnId);
 
@@ -59,6 +59,40 @@ final class ColumnSelected extends GridSelection {
   int get hashCode => Object.hash(ColumnSelected, columnId);
 }
 
+/// Une case de calcul sous une colonne, en bas de la grille. [index] est le
+/// numéro de la ligne de cases, à partir de 0.
+final class CalcCellSelected extends GridSelection {
+  const CalcCellSelected(this.index, super.columnId);
+
+  final int index;
+
+  @override
+  bool operator ==(Object other) =>
+      other is CalcCellSelected &&
+      other.index == index &&
+      other.columnId == columnId;
+
+  @override
+  int get hashCode => Object.hash(CalcCellSelected, index, columnId);
+}
+
+/// La case d'une colonne sur une ligne de regroupement. Son contenu vaut
+/// pour tous les groupes ; [groupKey] dit sur lequel on a cliqué.
+final class GroupCalcSelected extends GridSelection {
+  const GroupCalcSelected(super.columnId, this.groupKey);
+
+  final String groupKey;
+
+  @override
+  bool operator ==(Object other) =>
+      other is GroupCalcSelected &&
+      other.columnId == columnId &&
+      other.groupKey == groupKey;
+
+  @override
+  int get hashCode => Object.hash(GroupCalcSelected, columnId, groupKey);
+}
+
 final selectionProvider = NotifierProvider<Selection, GridSelection?>(
   Selection.new,
 );
@@ -75,6 +109,12 @@ class Selection extends Notifier<GridSelection?> {
       state = CellSelected(rowId, columnId);
 
   void selectColumn(ColumnId columnId) => state = ColumnSelected(columnId);
+
+  void selectCalcCell(int index, ColumnId columnId) =>
+      state = CalcCellSelected(index, columnId);
+
+  void selectGroupCalc(ColumnId columnId, String groupKey) =>
+      state = GroupCalcSelected(columnId, groupKey);
 
   void clear() => state = null;
 }
@@ -98,13 +138,73 @@ final selectedCellProvider = Provider<SelectedCell?>((ref) {
 });
 
 /// La colonne concernée par la sélection : celle de la cellule sélectionnée,
-/// ou la colonne sélectionnée en entier.
+/// ou la colonne sélectionnée en entier. `null` pour une case de calcul, qui
+/// ne se style pas.
 final selectedColumnProvider = Provider<ColumnDef?>((ref) {
   final sheet = ref.watch(activeSheetProvider);
   final selection = ref.watch(selectionProvider);
-  if (sheet == null || selection == null) return null;
-  return _findColumn(ref, sheet.id, selection.columnId);
+  if (sheet == null ||
+      (selection is! CellSelected && selection is! ColumnSelected)) {
+    return null;
+  }
+  return _findColumn(ref, sheet.id, selection!.columnId);
 });
+
+/// La colonne de la case de calcul sélectionnée, à jour ; `null` si la
+/// sélection n'est pas une case de calcul.
+final calcColumnProvider = Provider<ColumnDef?>((ref) {
+  final sheet = ref.watch(activeSheetProvider);
+  final selection = ref.watch(selectionProvider);
+  if (sheet == null ||
+      (selection is! CalcCellSelected && selection is! GroupCalcSelected)) {
+    return null;
+  }
+  return _findColumn(ref, sheet.id, selection!.columnId);
+});
+
+/// Les calculs d'une feuille : valeurs des colonnes Formule et évaluation des
+/// cases de calcul.
+final sheetFormulasProvider = Provider.family<SheetFormulas, SheetId>((
+  ref,
+  sheetId,
+) {
+  return SheetFormulas(
+    engine: ref.watch(formulaEngineProvider),
+    columns: ref.watch(columnsProvider(sheetId)).value ?? const [],
+    rows: ref.watch(rowsProvider(sheetId)).value ?? const [],
+  );
+});
+
+/// Volet des cases de calcul, en bas de la grille : sa hauteur et s'il est
+/// replié. Réglage d'affichage, gardé le temps de la session.
+typedef CalcPaneState = ({double height, bool hidden});
+
+final calcPaneProvider = NotifierProvider<CalcPane, CalcPaneState>(
+  CalcPane.new,
+);
+
+class CalcPane extends Notifier<CalcPaneState> {
+  static const double defaultHeight = 96;
+  static const double minHeight = 32;
+  static const double maxHeight = 420;
+
+  /// En dessous de cette hauteur, tirer la barre replie le volet.
+  static const double collapseBelow = 14;
+
+  @override
+  CalcPaneState build() => (height: defaultHeight, hidden: false);
+
+  void setHeight(double height) => state = (
+    height: height.clamp(minHeight, maxHeight).toDouble(),
+    hidden: false,
+  );
+
+  void toggle() => state = (height: state.height, hidden: !state.hidden);
+
+  void hide() => state = (height: state.height, hidden: true);
+
+  void reset() => state = (height: defaultHeight, hidden: false);
+}
 
 ColumnDef? _findColumn(Ref ref, SheetId sheetId, ColumnId columnId) {
   final columns = ref.watch(columnsProvider(sheetId)).value ?? const [];

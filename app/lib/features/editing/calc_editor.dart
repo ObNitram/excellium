@@ -1,0 +1,311 @@
+import 'package:excellium_core/excellium_core.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:material_ui/material_ui.dart';
+
+import '../../app/theme.dart';
+import '../../shared/providers.dart';
+import '../formulas/formula_text.dart';
+import '../grid/grid_providers.dart';
+
+/// Champ de saisie d'une formule ou d'un calcul, avec son message d'erreur.
+///
+/// Le texte est enregistré à chaque frappe. Le champ fait foi : il n'est
+/// réaligné sur la valeur enregistrée que lorsque [identity] change (on a
+/// choisi une autre colonne ou une autre case), pour ne jamais écraser ce
+/// qui est en train d'être tapé.
+class _FormulaField extends StatefulWidget {
+  const _FormulaField({
+    super.key,
+    required this.identity,
+    required this.text,
+    required this.onChanged,
+    required this.label,
+    required this.hint,
+    required this.error,
+    this.autofocus = false,
+    this.leading,
+    this.trailing = const [],
+    this.note,
+  });
+
+  /// Ce que le champ édite ; un changement recharge le texte.
+  final String identity;
+  final String text;
+  final ValueChanged<String> onChanged;
+
+  /// Nom du champ pour l'accessibilité.
+  final String label;
+  final String hint;
+  final FormulaError? error;
+
+  /// Vrai pour prendre le focus dès que [identity] change.
+  final bool autofocus;
+  final Widget? leading;
+
+  /// Boutons placés après le champ ; ils reçoivent de quoi y écrire.
+  final List<Widget> trailing;
+
+  /// Précision affichée quand il n'y a pas d'erreur.
+  final String? note;
+
+  @override
+  State<_FormulaField> createState() => _FormulaFieldState();
+}
+
+class _FormulaFieldState extends State<_FormulaField> {
+  late final _controller = TextEditingController(text: widget.text);
+  final _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.autofocus) _focus.requestFocus();
+  }
+
+  @override
+  void didUpdateWidget(_FormulaField old) {
+    super.didUpdateWidget(old);
+    // Tant qu'on édite la même chose, le champ fait foi : la valeur
+    // enregistrée arrive avec un temps de retard, et la recopier ici
+    // effacerait ce qui vient d'être tapé ou inséré.
+    if (old.identity != widget.identity) {
+      _controller.text = widget.text;
+      if (widget.autofocus) _focus.requestFocus();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  /// Ajoute [text] à la fin du champ, pour les boutons de fonction.
+  void append(String text) {
+    final next = _controller.text + text;
+    _controller.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: next.length),
+    );
+    widget.onChanged(next);
+    _focus.requestFocus();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final error = widget.error;
+    final border = OutlineInputBorder(
+      borderSide: BorderSide(
+        color: error == null ? AppColors.fieldBorder : AppColors.danger,
+        width: error == null ? 1 : 2,
+      ),
+    );
+    // Le message d'erreur est sur la même ligne que le champ : la barre garde
+    // sa hauteur, et la grille ne saute pas à chaque caractère pendant la
+    // saisie, où presque tous les états intermédiaires sont des erreurs.
+    return Row(
+      children: [
+        ?widget.leading,
+        Expanded(
+          flex: 3,
+          child: Semantics(
+            label: widget.label,
+            child: TextField(
+              controller: _controller,
+              focusNode: _focus,
+              onChanged: widget.onChanged,
+              autocorrect: false,
+              enableSuggestions: false,
+              style: const TextStyle(
+                fontSize: 13,
+                fontFamily: 'monospace',
+                fontFamilyFallback: ['Roboto Mono', 'Menlo', 'Consolas'],
+              ),
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: widget.hint,
+                border: border,
+                enabledBorder: border,
+                focusedBorder: border.copyWith(
+                  borderSide: BorderSide(
+                    color: error == null ? AppColors.accent : AppColors.danger,
+                    width: 2,
+                  ),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (error != null) ...[
+          const SizedBox(width: 12),
+          Flexible(
+            flex: 2,
+            child: Semantics(
+              liveRegion: true,
+              child: Tooltip(
+                message: formulaErrorMessage(error),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      size: 14,
+                      color: AppColors.danger,
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        formulaErrorMessage(error),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.danger,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ] else if (widget.note != null) ...[
+          const SizedBox(width: 12),
+          Text(
+            widget.note!,
+            style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+          ),
+        ],
+        // Les boutons font partie du champ : cliquer dessus à la souris ne
+        // lui retire pas le focus.
+        for (final button in widget.trailing) TextFieldTapRegion(child: button),
+      ],
+    );
+  }
+}
+
+/// Éditeur de la formule d'une colonne Formule. La formule vaut pour toutes
+/// les lignes : on la retrouve en sélectionnant une cellule ou la colonne.
+class FormulaEditor extends ConsumerWidget {
+  const FormulaEditor({super.key, required this.column});
+
+  final ColumnDef column;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final values = ref
+        .watch(sheetFormulasProvider(column.sheetId))
+        .column(column.id);
+    return _FormulaField(
+      key: const Key('formula-editor'),
+      identity: column.id.value,
+      text: column.formula,
+      onChanged: (text) =>
+          ref.read(workbookServiceProvider).setFormula(column, text),
+      label: 'Formule de la colonne',
+      hint: 'Quantité × Prix',
+      // Le champ prend le focus dès que la colonne est choisie : on écrit la
+      // formule tout de suite après avoir donné le type Formule.
+      autofocus: true,
+      error: values.error,
+      note: 'Calculée pour chaque ligne',
+      leading: const Padding(
+        padding: EdgeInsets.only(right: 8),
+        child: Text(
+          '=',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textMuted,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Éditeur d'une case de calcul : en bas de la grille, ou sur une ligne de
+/// regroupement. Le contenu est un texte, ou un calcul qui commence par `=`.
+class CalcEditor extends ConsumerStatefulWidget {
+  const CalcEditor({super.key, required this.column, required this.selection});
+
+  final ColumnDef column;
+
+  /// Une [CalcCellSelected] ou une [GroupCalcSelected].
+  final GridSelection selection;
+
+  @override
+  ConsumerState<CalcEditor> createState() => _CalcEditorState();
+}
+
+class _CalcEditorState extends ConsumerState<CalcEditor> {
+  final _field = GlobalKey<_FormulaFieldState>();
+
+  @override
+  Widget build(BuildContext context) {
+    final column = widget.column;
+    final selection = widget.selection;
+    final service = ref.read(workbookServiceProvider);
+    final formulas = ref.watch(sheetFormulasProvider(column.sheetId));
+
+    final String text;
+    final String identity;
+    final ValueChanged<String> save;
+    if (selection is CalcCellSelected) {
+      text = column.calcCells[selection.index] ?? '';
+      identity = 'calc-${column.id.value}-${selection.index}';
+      save = (next) => service.setCalcCell(column, selection.index, next);
+    } else {
+      // Le contenu est le même pour tous les groupes : changer de groupe ne
+      // recharge pas le champ.
+      text = column.groupCalc;
+      identity = 'group-${column.id.value}';
+      save = (next) => service.setGroupCalc(column, next);
+    }
+    // L'erreur ne dépend pas des lignes : on l'évalue sur toute la table.
+    final display = calcDisplay(formulas.calcCell(text));
+
+    return _FormulaField(
+      key: _field,
+      identity: identity,
+      text: text,
+      onChanged: save,
+      label: 'Contenu de la case de calcul',
+      hint: 'Texte, ou calcul : =Somme(Budget)',
+      error: display.error,
+      autofocus: true,
+      trailing: [
+        for (final function in formulas.functions)
+          if (function.kind == FormulaFunctionKind.column)
+            Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 30),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  textStyle: const TextStyle(fontSize: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+                onPressed: () {
+                  final field = _field.currentState;
+                  if (field == null) return;
+                  final current = field._controller.text;
+                  final lead = current.trim().isEmpty
+                      ? calcPrefix
+                      : (RegExp(r'[=(\s]$').hasMatch(current) ? '' : ' ');
+                  field.append('$lead${function.name}(');
+                },
+                child: Text(function.name),
+              ),
+            ),
+      ],
+    );
+  }
+}

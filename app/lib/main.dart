@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'app/excellium_app.dart';
 import 'app/startup_error_app.dart';
+import 'bootstrap/formulas.dart';
 import 'bootstrap/storage.dart';
 import 'shared/providers.dart';
 
@@ -11,7 +12,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Racine de composition : c'est ici, et seulement ici, que le moteur de
-  // stockage concret est choisi puis injecté.
+  // stockage et le moteur de formules concrets sont choisis puis injectés.
   final ExcelliumStore store;
   try {
     store = await openStore();
@@ -22,7 +23,10 @@ Future<void> main() async {
 
   runApp(
     ProviderScope(
-      overrides: [storeProvider.overrideWithValue(store)],
+      overrides: [
+        storeProvider.overrideWithValue(store),
+        formulaEngineProvider.overrideWithValue(createFormulaEngine()),
+      ],
       child: const ExcelliumApp(),
     ),
   );

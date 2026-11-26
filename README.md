@@ -5,7 +5,7 @@ catégories, booléen, référence vers une autre feuille), écrit en Flutter.
 
 ## Organisation
 
-Le dépôt est un espace de travail Dart composé de quatre paquets. Les
+Le dépôt est un espace de travail Dart composé de cinq paquets. Les
 dépendances ne vont que dans un sens : l'application et le stockage dépendent
 du cœur, jamais l'inverse.
 
@@ -13,8 +13,9 @@ du cœur, jamais l'inverse.
 |---|---|---|
 | `packages/excellium_core` | Cœur métier en Dart pur : modèle, règles de saisie, tri et filtres, cas d'usage, **interfaces de stockage** | rien (ni Flutter, ni base) |
 | `packages/excellium_storage_drift` | Implémentation SQLite des interfaces de stockage, avec Drift | `excellium_core`, `drift` |
+| `packages/excellium_formula` | Moteur de formules : implémente l'interface `FormulaEngine` du cœur | `excellium_core` |
 | `packages/excellium_store_contract` | Suite de tests que tout moteur de stockage doit réussir | `excellium_core`, `test` |
-| `app` | Interface Flutter et état (Riverpod) | `excellium_core`, et le stockage **uniquement** dans `lib/bootstrap/` |
+| `app` | Interface Flutter et état (Riverpod) | `excellium_core`, et les moteurs concrets (stockage, formules) **uniquement** dans `lib/bootstrap/` |
 
 ### Le cœur (`excellium_core`)
 
@@ -26,9 +27,13 @@ du cœur, jamais l'inverse.
   (`parseCellInput`), conversion lors d'un changement de type, tri et filtres
   (`applyRowQuery`), style effectif d'une cellule (`resolveStyle`), catégories
   d'une colonne, libellé et recherche des lignes référencées.
+- `logic/formulas.dart` : `SheetFormulas` relie colonnes et lignes au moteur
+  de formules (colonnes Formule, dépendances entre elles, cases de calcul) ;
+  `logic/grouping.dart` répartit les lignes en groupes.
 - `ports/` : `SheetRepository`, `ColumnRepository`, `RowRepository`,
   `ViewRepository` et `ExcelliumStore`. Ce sont les seules choses que le reste
-  du code connaît du stockage.
+  du code connaît du stockage. `ports/formula.dart` définit de même
+  `FormulaEngine`, la seule chose connue du moteur de formules.
 - `usecases/` : `WorkbookService`, pour les actions qui enchaînent plusieurs
   écritures ou portent une règle (créer une feuille, changer le type d'une
   colonne, styler une colonne, déplacer, enregistrer une vue…).
@@ -39,15 +44,19 @@ du cœur, jamais l'inverse.
 ```
 lib/
   main.dart            racine de composition : ouvre le stockage et l'injecte
-  bootstrap/           seul dossier autorisé à connaître Drift
+  bootstrap/           seul dossier autorisé à connaître Drift et le moteur
+                       de formules concret
   app/                 MaterialApp, thème, écran d'erreur de démarrage
   shared/              providers du stockage, panneau flottant, glisser-déposer
   features/
     workbook/          écran principal, onglets, feuille active
-    grid/              grille, rendu des cellules, sélection
+    grid/              grille, rendu des cellules, sélection, lignes de
+                       groupe, volet des cases de calcul
     columns/           en-tête de colonne, menu, filtre, renommage
     styling/           barre de style
-    editing/           barre d'édition, choix d'une ligne référencée
+    editing/           barre d'édition, choix d'une ligne référencée,
+                       éditeurs de formule et de case de calcul
+    formulas/          textes des résultats et des erreurs de formule
     views/             vue en cours, vues enregistrées, barre de vue
     kanban/            affichage Kanban
     calendar/          affichage Calendrier
@@ -64,7 +73,10 @@ travers `storeProvider`. Les principaux :
   colonnes masquées). Elle vit en mémoire ; seules les vues enregistrées vont
   dans le stockage ;
 - `visibleColumnsProvider`, `visibleRowsProvider` : ce que la vue en cours
-  laisse voir, partagé par la grille, le kanban et le calendrier.
+  laisse voir, partagé par la grille, le kanban et le calendrier ;
+- `rowGroupsProvider` : les groupes de la grille quand la vue regroupe ;
+- `sheetFormulasProvider` : les calculs d'une feuille (colonnes Formule et
+  cases de calcul), à partir de `formulaEngineProvider`.
 
 ## Changer de moteur de stockage
 
@@ -85,6 +97,66 @@ travers `storeProvider`. Les principaux :
 Aucun écran, provider ou cas d'usage n'est à modifier. Le test
 `app/test/architecture_test.dart` échoue si un fichier hors de `lib/bootstrap/`
 importe Drift.
+
+## Formules
+
+Le langage : nombres (virgule décimale), noms de colonne (entre crochets
+s'ils contiennent des espaces, ou lettre de la colonne), `+ - × /`,
+parenthèses et fonctions. Il sert à trois endroits :
+
+- **colonne Formule** : une formule par colonne, calculée pour chaque ligne
+  (`Quantité × Prix`) ;
+- **cases de calcul** sous la table : un texte, ou un calcul qui commence par
+  `=` (`=Somme(Budget)`), sur toute la table ;
+- **lignes de regroupement** : même convention, mais chaque groupe calcule sur
+  ses propres lignes.
+
+Fonctions fournies : `Somme`, `Moyenne`, `Min`, `Max`, `Nombre` (sur une
+colonne entière ; avec plusieurs colonnes, un résultat par colonne),
+`Arrondi` et `Abs` (ligne à ligne).
+
+### Ajouter une fonction
+
+Dans `packages/excellium_formula`, écrire une classe et l'ajouter à la liste
+`standardFunctions` (`lib/src/standard_functions.dart`). Rien d'autre n'est à
+modifier : l'analyse, les erreurs et les boutons de la barre d'édition
+s'appuient sur cette description.
+
+```dart
+/// Une valeur pour toute une colonne.
+final class MedianFunction extends ColumnFunction {
+  const MedianFunction();
+
+  @override
+  String get name => 'Médiane';
+
+  @override
+  String get example => 'Médiane(Budget)';
+
+  @override
+  double? compute(ColumnInput input) {
+    if (input.numbers.isEmpty) return null;
+    final sorted = [...input.numbers]..sort();
+    final middle = sorted.length ~/ 2;
+    return sorted.length.isOdd
+        ? sorted[middle]
+        : (sorted[middle - 1] + sorted[middle]) / 2;
+  }
+}
+```
+
+Une fonction ligne à ligne étend `RowFunction` de la même façon. On peut
+aussi passer sa propre liste au moteur, sans toucher au paquet :
+`ExcelliumFormulaEngine(functions: [...standardFunctions, const MedianFunction()])`
+dans `app/lib/bootstrap/formulas.dart`.
+
+### Changer de moteur de formules
+
+Écrire une classe qui implémente `FormulaEngine` (`evaluate` et `functions`)
+et la renvoyer depuis `app/lib/bootstrap/formulas.dart`. Le moteur ne connaît
+ni les feuilles ni les cellules : il reçoit un texte et un `FormulaScope` qui
+lui donne des séries de nombres, et rend un `FormulaOutcome`. Le cœur
+(`SheetFormulas`) et l'interface ne changent pas.
 
 ## Commandes
 
@@ -110,6 +182,10 @@ cd packages/excellium_core && dart test
 
 ```bash
 cd packages/excellium_storage_drift && dart test
+```
+
+```bash
+cd packages/excellium_formula && dart test
 ```
 
 ```bash
@@ -162,6 +238,11 @@ Fait :
 - tri et filtres depuis le menu de la colonne, critères rappelés dans la barre
   de vue ;
 - colonnes masquées, vues enregistrées (affichage, tri, filtres, colonnes) ;
+- regroupement de la grille selon une colonne Catégorie ou Référence, avec
+  groupes repliables, ajout de ligne dans un groupe et une opération par
+  colonne sur les lignes de groupe ;
+- colonne de type Formule ; cases de calcul sous la table, alignées sur les
+  colonnes, dans un volet réglable et repliable ;
 - affichages Grille, Kanban (à partir d'une colonne Catégorie unique) et
   Calendrier (à partir d'une colonne Date), avec glisser-déposer des lignes ;
 - dans le kanban, création d'une carte (une ligne) dans une étape et d'une
@@ -175,5 +256,8 @@ Pas encore fait :
   copier-coller, sélection de plusieurs cellules, navigation au clavier dans la
   grille ;
 - styles de police, de couleur et de bordure, formats de nombre ;
+- formules : pas de texte, de condition (`Si`) ni de référence d'une case de
+  calcul à une autre ; la hauteur du volet de calcul et les groupes repliés ne
+  sont pas mémorisés d'une session à l'autre ;
 - sélecteur de date en français (il s'affiche en anglais) ;
 - import et export.

@@ -282,6 +282,25 @@ void main() {
   });
 
   group('menu de colonne', () {
+    testWidgets('près du bord droit, le menu reste dans la fenêtre', (
+      tester,
+    ) async {
+      await pumpApp(tester, book.store, size: const Size(1200, 900));
+      await tester.tap(find.text('Tâches'));
+      await tester.pumpAndSettle();
+
+      await openColumnMenu(tester, 'Responsable');
+
+      final panel = tester.getRect(find.byKey(const Key('popover-panel')));
+      expect(panel.right, lessThanOrEqualTo(1200));
+      expect(panel.left, greaterThanOrEqualTo(0));
+      // Il reste accroché à sa colonne.
+      final anchor = tester.getRect(
+        find.byTooltip('Options de la colonne Responsable'),
+      );
+      expect(panel.right, closeTo(anchor.right, 1));
+    });
+
     testWidgets('Échap ferme le menu, même sans champ de saisie', (
       tester,
     ) async {

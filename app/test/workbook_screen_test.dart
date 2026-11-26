@@ -2,6 +2,7 @@ import 'package:excellium_app/app/excellium_app.dart';
 import 'package:excellium_app/shared/providers.dart';
 import 'package:excellium_core/excellium_core.dart';
 import 'package:excellium_core/memory.dart';
+import 'package:excellium_formula/excellium_formula.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -36,7 +37,10 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [storeProvider.overrideWithValue(store)],
+        overrides: [
+          storeProvider.overrideWithValue(store),
+          formulaEngineProvider.overrideWithValue(ExcelliumFormulaEngine()),
+        ],
         child: const ExcelliumApp(),
       ),
     );
@@ -57,8 +61,10 @@ void main() {
     expect(find.text('A'), findsOneWidget);
     expect(find.text('B'), findsOneWidget);
     expect(find.text('C'), findsOneWidget);
-    expect(find.text('1'), findsOneWidget);
-    expect(find.text('4'), findsOneWidget);
+    // Le volet des cases de calcul numérote aussi ses lignes : on vise les
+    // numéros de la table.
+    expect(find.byTooltip('Options de la ligne 1'), findsOneWidget);
+    expect(find.byTooltip('Options de la ligne 4'), findsOneWidget);
     expect(
       find.text('Sélectionnez une cellule pour la modifier.'),
       findsOneWidget,

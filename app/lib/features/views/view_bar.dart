@@ -56,7 +56,13 @@ class _ViewBarState extends ConsumerState<ViewBar> {
       for (final column in columns)
         if (spec.hiddenColumnIds.contains(column.id)) column,
     ];
-    final hasCriteria = !spec.query.isEmpty || hidden.isNotEmpty;
+    final groupColumn = ref.watch(groupColumnProvider(sheetId));
+    final groupable = [
+      for (final column in columns)
+        if (canGroupBy(column.type)) column,
+    ];
+    final hasCriteria =
+        !spec.query.isEmpty || hidden.isNotEmpty || groupColumn != null;
     final kind = spec.layout.kind;
 
     final items = <(String, VoidCallback)>[
@@ -210,6 +216,54 @@ class _ViewBarState extends ConsumerState<ViewBar> {
               ],
             ),
           ),
+          if (kind == LayoutKind.grid)
+            Popover(
+              width: 260,
+              anchorBuilder: (context, toggle, _) => BarButton(
+                icon: Icons.table_rows_outlined,
+                label: groupColumn == null
+                    ? 'Regrouper'
+                    : 'Regroupé par : ${columnTitle(groupColumn)}',
+                onPressed: toggle,
+              ),
+              panelBuilder: (context, close) => Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const PanelTitle('Regrouper les lignes par'),
+                  PanelItem(
+                    label: 'Aucun regroupement',
+                    selected: groupColumn == null,
+                    onTap: () {
+                      view.setGroupBy(null);
+                      close();
+                    },
+                  ),
+                  if (groupable.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(10),
+                      child: Text(
+                        'Aucune colonne de type Catégorie ou Référence dans '
+                        'cette feuille.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ),
+                  for (final column in groupable)
+                    PanelItem(
+                      icon: column.type.icon,
+                      label: columnTitle(column),
+                      selected: column.id == groupColumn?.id,
+                      onTap: () {
+                        view.setGroupBy(column.id);
+                        close();
+                      },
+                    ),
+                ],
+              ),
+            ),
           if (kind != LayoutKind.grid)
             Popover(
               width: 260,
