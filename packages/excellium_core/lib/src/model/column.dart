@@ -2,6 +2,7 @@ import 'package:collection/collection.dart';
 import 'package:meta/meta.dart';
 
 import 'ids.dart';
+import 'style.dart';
 
 /// Les types de colonne proposés à l'utilisateur.
 enum ColumnType {
@@ -83,6 +84,8 @@ final class ColumnDef {
     this.type = ColumnType.text,
     this.width = defaultWidth,
     this.reference,
+    this.style = CellStyle.none,
+    this.options = const [],
   });
 
   static const double defaultWidth = 120;
@@ -103,6 +106,13 @@ final class ColumnDef {
   /// Renseigné uniquement pour [ColumnType.reference].
   final ReferenceConfig? reference;
 
+  /// Style appliqué à toutes les cellules de la colonne.
+  final CellStyle style;
+
+  /// Catégories définies pour une colonne Catégorie, dans l'ordre choisi par
+  /// l'utilisateur. C'est aussi l'ordre des étapes d'un kanban.
+  final List<String> options;
+
   /// Lettre de la colonne d'après son rang (A, B, …, Z, AA, …).
   String get letter => columnLetter(position);
 
@@ -116,6 +126,8 @@ final class ColumnDef {
     double? width,
     ReferenceConfig? reference,
     bool clearReference = false,
+    CellStyle? style,
+    List<String>? options,
   }) => ColumnDef(
     id: id,
     sheetId: sheetId,
@@ -124,6 +136,8 @@ final class ColumnDef {
     type: type ?? this.type,
     width: width ?? this.width,
     reference: clearReference ? null : (reference ?? this.reference),
+    style: style ?? this.style,
+    options: options ?? this.options,
   );
 
   @override
@@ -135,11 +149,22 @@ final class ColumnDef {
       other.name == name &&
       other.type == type &&
       other.width == width &&
-      other.reference == reference;
+      other.reference == reference &&
+      other.style == style &&
+      const ListEquality<String>().equals(other.options, options);
 
   @override
-  int get hashCode =>
-      Object.hash(id, sheetId, position, name, type, width, reference);
+  int get hashCode => Object.hash(
+    id,
+    sheetId,
+    position,
+    name,
+    type,
+    width,
+    reference,
+    style,
+    const ListEquality<String>().hash(options),
+  );
 
   @override
   String toString() => 'ColumnDef($label, $type, #$position)';

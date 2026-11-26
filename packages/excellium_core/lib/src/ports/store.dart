@@ -3,6 +3,8 @@ import '../model/column.dart';
 import '../model/ids.dart';
 import '../model/row.dart';
 import '../model/sheet.dart';
+import '../model/style.dart';
+import '../model/view.dart';
 
 /// Interfaces de stockage (« ports »).
 ///
@@ -45,8 +47,8 @@ abstract interface class ColumnRepository {
     ColumnType type = ColumnType.text,
   });
 
-  /// Enregistre le nom, le type, la largeur et les paramètres de [column].
-  /// Le rang se change avec [reorderColumns].
+  /// Enregistre le nom, le type, la largeur, le style, les catégories et les
+  /// paramètres de [column]. Le rang se change avec [reorderColumns].
   Future<void> updateColumn(ColumnDef column);
 
   /// Réordonne les colonnes ; [orderedIds] doit contenir tous les identifiants
@@ -69,8 +71,30 @@ abstract interface class RowRepository {
   /// Écrit une cellule ; `null` la vide.
   Future<void> setCell(RowId rowId, ColumnId columnId, CellValue? value);
 
+  /// Écrit le style propre à une cellule ; `null` ou un style vide le retire.
+  Future<void> setCellStyle(RowId rowId, ColumnId columnId, CellStyle? style);
+
+  /// Règle la hauteur d'une ligne ; `null` rétablit la hauteur par défaut.
+  Future<void> setRowHeight(RowId rowId, double? height);
+
   /// Supprime la ligne et ses cellules.
   Future<void> deleteRow(RowId id);
+}
+
+/// Les vues enregistrées d'une feuille, triées par rang.
+abstract interface class ViewRepository {
+  Stream<List<SavedView>> watchViews(SheetId sheetId);
+
+  Future<List<SavedView>> getViews(SheetId sheetId);
+
+  /// Enregistre une nouvelle vue en dernière position.
+  Future<SavedView> createView(
+    SheetId sheetId, {
+    required String name,
+    required ViewSpec spec,
+  });
+
+  Future<void> deleteView(ViewId id);
 }
 
 /// Point d'entrée d'un moteur de stockage.
@@ -80,6 +104,8 @@ abstract interface class ExcelliumStore {
   ColumnRepository get columns;
 
   RowRepository get rows;
+
+  ViewRepository get views;
 
   /// Exécute [action] de façon atomique : tout est enregistré, ou rien.
   Future<T> transaction<T>(Future<T> Function() action);

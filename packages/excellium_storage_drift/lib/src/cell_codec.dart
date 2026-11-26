@@ -79,3 +79,156 @@ ReferenceConfig decodeReferenceConfig(String source) {
 /// Texte pour que la feuille reste lisible.
 ColumnType decodeColumnType(String name) =>
     ColumnType.values.asNameMap()[name] ?? ColumnType.text;
+
+String? encodeCellStyle(CellStyle style) => style.isEmpty
+    ? null
+    : jsonEncode({
+        if (style.bold != null) 'bold': style.bold,
+        if (style.italic != null) 'italic': style.italic,
+        if (style.underline != null) 'underline': style.underline,
+        if (style.align != null) 'align': style.align!.name,
+        if (style.boolDisplay != null) 'bool': style.boolDisplay!.name,
+        if (style.percentDisplay != null) 'percent': style.percentDisplay!.name,
+      });
+
+CellStyle decodeCellStyle(String? source) {
+  final map = _decodeMap(source);
+  if (map == null) return CellStyle.none;
+  bool? flag(String key) => map[key] is bool ? map[key]! as bool : null;
+  return CellStyle(
+    bold: flag('bold'),
+    italic: flag('italic'),
+    underline: flag('underline'),
+    align: TextAlignment.values.asNameMap()[map['align']],
+    boolDisplay: BoolDisplay.values.asNameMap()[map['bool']],
+    percentDisplay: PercentDisplay.values.asNameMap()[map['percent']],
+  );
+}
+
+String? encodeOptions(List<String> options) =>
+    options.isEmpty ? null : jsonEncode(options);
+
+List<String> decodeOptions(String? source) {
+  if (source == null) return const [];
+  try {
+    final decoded = jsonDecode(source);
+    return decoded is List<Object?>
+        ? decoded.whereType<String>().toList()
+        : const [];
+  } on FormatException {
+    return const [];
+  }
+}
+
+String encodeViewSpec(ViewSpec spec) => jsonEncode({
+  'layout': spec.layout.kind.name,
+  'key': spec.layout.keyColumnId?.value,
+  'sort': spec.query.sort == null
+      ? null
+      : {
+          'column': spec.query.sort!.columnId.value,
+          'ascending': spec.query.sort!.ascending,
+        },
+  'filters': {
+    for (final entry in spec.query.filters.entries)
+      entry.key.value: _encodeFilter(entry.value),
+  },
+  'hidden': [for (final id in spec.hiddenColumnIds) id.value],
+});
+
+/// Une vue illisible redevient la vue complète, plutôt que de bloquer la
+/// feuille.
+ViewSpec decodeViewSpec(String source) {
+  final map = _decodeMap(source);
+  if (map == null) return ViewSpec.full;
+  final key = map['key'];
+  final sort = map['sort'];
+  final filters = map['filters'];
+  final hidden = map['hidden'];
+  return ViewSpec(
+    layout: ViewLayout(
+      LayoutKind.values.asNameMap()[map['layout']] ?? LayoutKind.grid,
+      key is String ? ColumnId(key) : null,
+    ),
+    query: RowQuery(
+      sort: sort is Map<String, Object?> && sort['column'] is String
+          ? SortSpec(
+              ColumnId(sort['column']! as String),
+              ascending: sort['ascending'] != false,
+            )
+          : null,
+      filters: {
+        if (filters is Map<String, Object?>)
+          for (final entry in filters.entries)
+            ColumnId(entry.key): ?_decodeFilter(entry.value),
+      },
+    ),
+    hiddenColumnIds: hidden is List<Object?>
+        ? hidden.whereType<String>().map(ColumnId.new)
+        : const [],
+  );
+}
+
+Map<String, Object?> _encodeFilter(FilterSpec filter) => switch (filter) {
+  TextContains(:final query) => {'t': 'text', 'query': query},
+  NumberRange(:final min, :final max) => {
+    't': 'number',
+    'min': min,
+    'max': max,
+  },
+  DateRange(:final from, :final to) => {
+    't': 'date',
+    'from': from?.iso,
+    'to': to?.iso,
+  },
+  DurationRange(:final min, :final max) => {
+    't': 'duration',
+    'min': min?.inMicroseconds,
+    'max': max?.inMicroseconds,
+  },
+  CategoryAnyOf(:final categories) => {
+    't': 'category',
+    'values': categories.toList(),
+  },
+  BoolIs(:final value) => {'t': 'bool', 'value': value},
+  ReferenceAnyOf(:final rowIds) => {
+    't': 'reference',
+    'values': [for (final id in rowIds) id.value],
+  },
+};
+
+FilterSpec? _decodeFilter(Object? source) {
+  if (source is! Map<String, Object?>) return null;
+  double? number(String key) =>
+      source[key] is num ? (source[key]! as num).toDouble() : null;
+  DateValue? date(String key) => source[key] is String
+      ? DateValue.tryParseIso(source[key]! as String)
+      : null;
+  Duration? duration(String key) =>
+      source[key] is int ? Duration(microseconds: source[key]! as int) : null;
+  Iterable<String> strings() => source['values'] is List<Object?>
+      ? (source['values']! as List<Object?>).whereType<String>()
+      : const [];
+  return switch (source['t']) {
+    'text' when source['query'] is String => TextContains(
+      source['query']! as String,
+    ),
+    'number' => NumberRange(min: number('min'), max: number('max')),
+    'date' => DateRange(from: date('from'), to: date('to')),
+    'duration' => DurationRange(min: duration('min'), max: duration('max')),
+    'category' => CategoryAnyOf(strings()),
+    'bool' when source['value'] is bool => BoolIs(source['value']! as bool),
+    'reference' => ReferenceAnyOf(strings().map(RowId.new)),
+    _ => null,
+  };
+}
+
+Map<String, Object?>? _decodeMap(String? source) {
+  if (source == null) return null;
+  try {
+    final decoded = jsonDecode(source);
+    return decoded is Map<String, Object?> ? decoded : null;
+  } on FormatException {
+    return null;
+  }
+}

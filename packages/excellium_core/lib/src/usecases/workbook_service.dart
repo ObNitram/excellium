@@ -1,9 +1,12 @@
+import '../logic/categories.dart';
 import '../logic/cell_input.dart';
 import '../model/cell_value.dart';
 import '../model/column.dart';
 import '../model/ids.dart';
 import '../model/row.dart';
 import '../model/sheet.dart';
+import '../model/style.dart';
+import '../model/view.dart';
 import '../ports/store.dart';
 
 /// Cas d'usage du classeur : les règles qui enchaînent plusieurs opérations
@@ -73,6 +76,102 @@ final class WorkbookService {
           width: width.clamp(ColumnDef.minWidth, ColumnDef.maxWidth).toDouble(),
         ),
       );
+
+  /// Règle la hauteur d'une ligne, bornée ; `null` rétablit la hauteur par
+  /// défaut.
+  Future<void> resizeRow(SheetRow row, double? height) =>
+      _store.rows.setRowHeight(
+        row.id,
+        height?.clamp(SheetRow.minHeight, SheetRow.maxHeight).toDouble(),
+      );
+
+  /// Applique [patch] au style de toute la colonne.
+  ///
+  /// Les cellules qui avaient un réglage individuel pour ces propriétés le
+  /// perdent : c'est le réglage de la colonne qui s'applique partout.
+  Future<void> styleColumn(ColumnDef column, CellStyle patch) {
+    return _store.transaction(() async {
+      await _store.columns.updateColumn(
+        column.copyWith(style: column.style.merge(patch)),
+      );
+      final rows = await _store.rows.getRows(column.sheetId);
+      for (final row in rows) {
+        final own = row.styles[column.id];
+        if (own == null) continue;
+        final cleaned = own.without(patch);
+        if (cleaned != own) {
+          await _store.rows.setCellStyle(row.id, column.id, cleaned);
+        }
+      }
+    });
+  }
+
+  /// Applique [patch] au style d'une seule cellule.
+  Future<void> styleCell(SheetRow row, ColumnDef column, CellStyle patch) =>
+      _store.rows.setCellStyle(
+        row.id,
+        column.id,
+        (row.styles[column.id] ?? CellStyle.none).merge(patch),
+      );
+
+  /// Choisit ou retire une catégorie dans une cellule, et l'ajoute aux
+  /// catégories définies de la colonne si elle est nouvelle.
+  Future<void> toggleCellCategory(
+    SheetRow row,
+    ColumnDef column,
+    String category,
+  ) {
+    final name = category.trim();
+    if (name.isEmpty) return Future.value();
+    return _store.transaction(() async {
+      if (!column.options.contains(name)) {
+        await _store.columns.updateColumn(
+          column.copyWith(options: [...column.options, name]),
+        );
+      }
+      await _store.rows.setCell(
+        row.id,
+        column.id,
+        toggleCategory(
+          row[column.id],
+          name,
+          multiple: column.type == ColumnType.multiCategory,
+        ),
+      );
+    });
+  }
+
+  /// Fixe l'ordre des catégories d'une colonne (l'ordre des étapes d'un
+  /// kanban). Les catégories seulement présentes dans les cellules sont
+  /// enregistrées au passage.
+  Future<void> reorderCategories(ColumnDef column, List<String> ordered) =>
+      _store.columns.updateColumn(column.copyWith(options: ordered));
+
+  /// Règle la feuille visée, la cardinalité et les colonnes de recherche d'une
+  /// colonne Référence.
+  Future<void> configureReference(ColumnDef column, ReferenceConfig config) =>
+      _store.columns.updateColumn(column.copyWith(reference: config));
+
+  /// Enregistre une vue. Sans [name], elle s'appelle « Vue N ».
+  Future<SavedView> saveView(SheetId sheetId, ViewSpec spec, {String? name}) {
+    return _store.transaction(() async {
+      final existing = await _store.views.getViews(sheetId);
+      final names = {for (final view in existing) view.name};
+      var label = name?.trim() ?? '';
+      if (label.isEmpty) {
+        var n = existing.length + 1;
+        while (names.contains('Vue $n')) {
+          n++;
+        }
+        label = 'Vue $n';
+      }
+      return _store.views.createView(
+        sheetId,
+        name: label,
+        spec: spec.normalized,
+      );
+    });
+  }
 
   /// Change le type d'une colonne et convertit les valeurs existantes.
   ///

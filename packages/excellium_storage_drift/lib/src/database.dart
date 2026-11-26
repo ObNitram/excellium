@@ -34,6 +34,12 @@ class ColumnRecords extends Table {
   /// Paramètres d'une colonne Référence, en JSON ; `null` pour les autres.
   TextColumn get reference => text().nullable()();
 
+  /// Style de la colonne, en JSON ; `null` s'il n'y en a pas.
+  TextColumn get style => text().nullable()();
+
+  /// Catégories définies, en JSON ; `null` s'il n'y en a pas.
+  TextColumn get options => text().nullable()();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
@@ -47,6 +53,9 @@ class RowRecords extends Table {
   TextColumn get sheetId =>
       text().references(SheetRecords, #id, onDelete: KeyAction.cascade)();
   IntColumn get position => integer()();
+
+  /// Hauteur choisie ; `null` pour la hauteur par défaut.
+  RealColumn get height => real().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -69,15 +78,70 @@ class CellRecords extends Table {
   Set<Column<Object>> get primaryKey => {rowId, columnId};
 }
 
-@DriftDatabase(tables: [SheetRecords, ColumnRecords, RowRecords, CellRecords])
+/// Style propre à une cellule. Table séparée des valeurs : une cellule vide
+/// peut avoir un style.
+@DataClassName('CellStyleRecord')
+class CellStyleRecords extends Table {
+  @override
+  String get tableName => 'cell_styles';
+
+  TextColumn get rowId =>
+      text().references(RowRecords, #id, onDelete: KeyAction.cascade)();
+  TextColumn get columnId =>
+      text().references(ColumnRecords, #id, onDelete: KeyAction.cascade)();
+  TextColumn get style => text()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {rowId, columnId};
+}
+
+@DataClassName('ViewRecord')
+class ViewRecords extends Table {
+  @override
+  String get tableName => 'views';
+
+  TextColumn get id => text()();
+  TextColumn get sheetId =>
+      text().references(SheetRecords, #id, onDelete: KeyAction.cascade)();
+  TextColumn get name => text()();
+  IntColumn get position => integer()();
+
+  /// Affichage, tri, filtres et colonnes masquées, en JSON.
+  TextColumn get spec => text()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+@DriftDatabase(
+  tables: [
+    SheetRecords,
+    ColumnRecords,
+    RowRecords,
+    CellRecords,
+    CellStyleRecords,
+    ViewRecords,
+  ],
+)
 class ExcelliumDatabase extends _$ExcelliumDatabase {
   ExcelliumDatabase(super.executor);
 
+  /// Version 2 : styles de colonne et de cellule, catégories définies,
+  /// hauteur de ligne, vues enregistrées.
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        await m.addColumn(columnRecords, columnRecords.style);
+        await m.addColumn(columnRecords, columnRecords.options);
+        await m.addColumn(rowRecords, rowRecords.height);
+        await m.createTable(cellStyleRecords);
+        await m.createTable(viewRecords);
+      }
+    },
     beforeOpen: (details) async {
       // Sans cette ligne SQLite ignore les suppressions en cascade.
       await customStatement('PRAGMA foreign_keys = ON');

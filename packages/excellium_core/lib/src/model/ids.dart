@@ -9,6 +9,8 @@ extension type const ColumnId(String value) {}
 
 extension type const RowId(String value) {}
 
+extension type const ViewId(String value) {}
+
 const _uuid = Uuid();
 
 /// Génère un nouvel identifiant unique.

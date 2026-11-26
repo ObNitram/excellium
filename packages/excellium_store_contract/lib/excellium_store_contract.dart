@@ -232,6 +232,235 @@ void runStoreContractTests(
       });
     });
 
+    group('styles, catégories et hauteur', () {
+      late Sheet sheet;
+      late ColumnDef column;
+      late SheetRow row;
+
+      setUp(() async {
+        sheet = await store.sheets.createSheet(name: 'S');
+        column = await store.columns.addColumn(sheet.id);
+        row = await store.rows.addRow(sheet.id);
+      });
+
+      test('une colonne neuve n\'a ni style ni catégories', () async {
+        final saved = (await store.columns.getColumns(sheet.id)).single;
+        expect(saved.style, CellStyle.none);
+        expect(saved.options, isEmpty);
+      });
+
+      test('le style et les catégories d\'une colonne sont relus', () async {
+        const style = CellStyle(
+          bold: true,
+          italic: false,
+          align: TextAlignment.center,
+          boolDisplay: BoolDisplay.toggle,
+          percentDisplay: PercentDisplay.bar,
+        );
+        await store.columns.updateColumn(
+          column.copyWith(style: style, options: ['À faire', 'Terminé']),
+        );
+
+        final saved = (await store.columns.getColumns(sheet.id)).single;
+        expect(saved.style, style);
+        expect(saved.options, ['À faire', 'Terminé']);
+      });
+
+      test('le style d\'une cellule est relu, même si elle est vide', () async {
+        const style = CellStyle(underline: true, align: TextAlignment.right);
+        await store.rows.setCellStyle(row.id, column.id, style);
+
+        final saved = (await store.rows.getRows(sheet.id)).single;
+        expect(saved.styles, {column.id: style});
+        expect(saved.cells, isEmpty);
+      });
+
+      test('valeur et style d\'une cellule sont indépendants', () async {
+        const style = CellStyle(bold: true);
+        await store.rows.setCell(row.id, column.id, const TextValue('x'));
+        await store.rows.setCellStyle(row.id, column.id, style);
+        await store.rows.setCell(row.id, column.id, null);
+
+        var saved = (await store.rows.getRows(sheet.id)).single;
+        expect(saved.cells, isEmpty);
+        expect(saved.styles, {column.id: style});
+
+        await store.rows.setCell(row.id, column.id, const TextValue('y'));
+        await store.rows.setCellStyle(row.id, column.id, null);
+        saved = (await store.rows.getRows(sheet.id)).single;
+        expect(saved.cells, {column.id: const TextValue('y')});
+        expect(saved.styles, isEmpty);
+      });
+
+      test('un style vide retire le style de la cellule', () async {
+        await store.rows.setCellStyle(
+          row.id,
+          column.id,
+          const CellStyle(bold: true),
+        );
+        await store.rows.setCellStyle(row.id, column.id, CellStyle.none);
+
+        expect((await store.rows.getRows(sheet.id)).single.styles, isEmpty);
+      });
+
+      test(
+        'plusieurs cellules stylées et remplies sur une même ligne',
+        () async {
+          final second = await store.columns.addColumn(sheet.id);
+          await store.rows.setCell(row.id, column.id, const TextValue('a'));
+          await store.rows.setCell(row.id, second.id, const TextValue('b'));
+          await store.rows.setCellStyle(
+            row.id,
+            column.id,
+            const CellStyle(bold: true),
+          );
+          await store.rows.setCellStyle(
+            row.id,
+            second.id,
+            const CellStyle(italic: true),
+          );
+
+          final saved = (await store.rows.getRows(sheet.id)).single;
+          expect(saved.cells, {
+            column.id: const TextValue('a'),
+            second.id: const TextValue('b'),
+          });
+          expect(saved.styles, {
+            column.id: const CellStyle(bold: true),
+            second.id: const CellStyle(italic: true),
+          });
+        },
+      );
+
+      test(
+        'supprimer une colonne retire aussi les styles de ses cellules',
+        () async {
+          await store.rows.setCellStyle(
+            row.id,
+            column.id,
+            const CellStyle(bold: true),
+          );
+          await store.columns.deleteColumn(column.id);
+
+          expect((await store.rows.getRows(sheet.id)).single.styles, isEmpty);
+        },
+      );
+
+      test('la hauteur d\'une ligne se règle et se rétablit', () async {
+        expect((await store.rows.getRows(sheet.id)).single.height, isNull);
+
+        await store.rows.setRowHeight(row.id, 44);
+        expect((await store.rows.getRows(sheet.id)).single.height, 44);
+
+        await store.rows.setRowHeight(row.id, null);
+        expect((await store.rows.getRows(sheet.id)).single.height, isNull);
+      });
+    });
+
+    group('vues enregistrées', () {
+      late Sheet sheet;
+      late ColumnDef status;
+      late ColumnDef due;
+
+      setUp(() async {
+        sheet = await store.sheets.createSheet(name: 'S');
+        status = await store.columns.addColumn(
+          sheet.id,
+          type: ColumnType.singleCategory,
+        );
+        due = await store.columns.addColumn(sheet.id, type: ColumnType.date);
+      });
+
+      test(
+        'une vue est relue à l\'identique, avec tous les critères',
+        () async {
+          final text = await store.columns.addColumn(sheet.id);
+          final number = await store.columns.addColumn(sheet.id);
+          final duration = await store.columns.addColumn(sheet.id);
+          final flag = await store.columns.addColumn(sheet.id);
+          final link = await store.columns.addColumn(sheet.id);
+          final spec = ViewSpec(
+            layout: ViewLayout.kanban(status.id),
+            query: RowQuery(
+              sort: SortSpec(due.id, ascending: false),
+              filters: {
+                status.id: CategoryAnyOf(['En cours', 'À faire']),
+                due.id: DateRange(
+                  from: DateValue(2026, 12, 1),
+                  to: DateValue(2026, 12, 31),
+                ),
+                text.id: const TextContains('client'),
+                number.id: const NumberRange(min: 10.5),
+                duration.id: const DurationRange(max: Duration(hours: 2)),
+                flag.id: const BoolIs(false),
+                link.id: ReferenceAnyOf(const [RowId('r1')]),
+              },
+            ),
+            hiddenColumnIds: [due.id],
+          );
+
+          final created = await store.views.createView(
+            sheet.id,
+            name: 'À traiter',
+            spec: spec,
+          );
+
+          final saved = (await store.views.getViews(sheet.id)).single;
+          expect(saved, created);
+          expect(saved.name, 'À traiter');
+          expect(saved.spec, spec);
+          expect(saved.position, 0);
+        },
+      );
+
+      test('les vues sont ordonnées et propres à chaque feuille', () async {
+        final other = await store.sheets.createSheet(name: 'Autre');
+        await store.views.createView(sheet.id, name: 'A', spec: ViewSpec.full);
+        await store.views.createView(sheet.id, name: 'B', spec: ViewSpec.full);
+        await store.views.createView(other.id, name: 'C', spec: ViewSpec.full);
+
+        final views = await store.views.getViews(sheet.id);
+        expect(views.map((v) => v.name), ['A', 'B']);
+        expect(views.map((v) => v.position), [0, 1]);
+        expect(await store.views.getViews(other.id), hasLength(1));
+      });
+
+      test('supprimer une vue resserre les rangs', () async {
+        final a = await store.views.createView(
+          sheet.id,
+          name: 'A',
+          spec: ViewSpec.full,
+        );
+        await store.views.createView(sheet.id, name: 'B', spec: ViewSpec.full);
+
+        await store.views.deleteView(a.id);
+
+        final views = await store.views.getViews(sheet.id);
+        expect(views.map((v) => v.name), ['B']);
+        expect(views.single.position, 0);
+      });
+
+      test('supprimer une feuille supprime ses vues', () async {
+        await store.views.createView(sheet.id, name: 'A', spec: ViewSpec.full);
+        await store.sheets.deleteSheet(sheet.id);
+
+        expect(await store.views.getViews(sheet.id), isEmpty);
+      });
+
+      test('watchViews émet après un enregistrement', () async {
+        final names = store.views
+            .watchViews(sheet.id)
+            .map((views) => views.map((v) => v.name).toList());
+        final seen = expectLater(names, emitsThrough(equals(['Suivi'])));
+        await store.views.createView(
+          sheet.id,
+          name: 'Suivi',
+          spec: ViewSpec(layout: ViewLayout.calendar(due.id)),
+        );
+        await seen;
+      });
+    });
+
     group('flux', () {
       test('watchSheets émet l\'état courant puis les changements', () async {
         await store.sheets.createSheet(name: 'A');

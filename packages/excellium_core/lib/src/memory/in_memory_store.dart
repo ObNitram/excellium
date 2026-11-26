@@ -7,6 +7,8 @@ import '../model/column.dart';
 import '../model/ids.dart';
 import '../model/row.dart';
 import '../model/sheet.dart';
+import '../model/style.dart';
+import '../model/view.dart';
 import '../ports/store.dart';
 
 /// Stockage en mémoire, sans persistance.
@@ -18,6 +20,7 @@ final class InMemoryStore implements ExcelliumStore {
     sheets = _Sheets(this);
     columns = _Columns(this);
     rows = _Rows(this);
+    views = _Views(this);
   }
 
   @override
@@ -29,6 +32,10 @@ final class InMemoryStore implements ExcelliumStore {
   @override
   late final RowRepository rows;
 
+  @override
+  late final ViewRepository views;
+
+  final Map<ViewId, SavedView> _views = {};
   final Map<SheetId, Sheet> _sheets = {};
   final Map<ColumnId, ColumnDef> _columns = {};
   final Map<RowId, SheetRow> _rows = {};
@@ -58,7 +65,7 @@ final class InMemoryStore implements ExcelliumStore {
   @override
   Future<T> transaction<T>(Future<T> Function() action) async {
     final snapshot = _transactionDepth == 0
-        ? (Map.of(_sheets), Map.of(_columns), Map.of(_rows))
+        ? (Map.of(_sheets), Map.of(_columns), Map.of(_rows), Map.of(_views))
         : null;
     _transactionDepth++;
     try {
@@ -74,6 +81,9 @@ final class InMemoryStore implements ExcelliumStore {
         _rows
           ..clear()
           ..addAll(snapshot.$3);
+        _views
+          ..clear()
+          ..addAll(snapshot.$4);
         _dirty = false;
       }
       rethrow;
@@ -99,6 +109,10 @@ final class InMemoryStore implements ExcelliumStore {
   List<SheetRow> _sortedRows(SheetId sheetId) => _rows.values
       .where((row) => row.sheetId == sheetId)
       .sortedBy<num>((row) => row.position);
+
+  List<SavedView> _sortedViews(SheetId sheetId) => _views.values
+      .where((view) => view.sheetId == sheetId)
+      .sortedBy<num>((view) => view.position);
 }
 
 final class _Sheets implements SheetRepository {
@@ -146,6 +160,7 @@ final class _Sheets implements SheetRepository {
     if (_store._sheets.remove(id) == null) return;
     _store._columns.removeWhere((_, column) => column.sheetId == id);
     _store._rows.removeWhere((_, row) => row.sheetId == id);
+    _store._views.removeWhere((_, view) => view.sheetId == id);
     for (final (index, sheet) in _store._sortedSheets().indexed) {
       _store._sheets[sheet.id] = sheet.copyWith(position: index);
     }
@@ -212,7 +227,9 @@ final class _Columns implements ColumnRepository {
     final column = _store._columns.remove(id);
     if (column == null) return;
     for (final row in _store._sortedRows(column.sheetId)) {
-      if (row[id] != null) _store._rows[row.id] = row.withCell(id, null);
+      if (row[id] != null || row.styles[id] != null) {
+        _store._rows[row.id] = row.withCell(id, null).withStyle(id, null);
+      }
     }
     for (final (index, other)
         in _store._sortedColumns(column.sheetId).indexed) {
@@ -256,11 +273,82 @@ final class _Rows implements RowRepository {
   }
 
   @override
+  Future<void> setCellStyle(
+    RowId rowId,
+    ColumnId columnId,
+    CellStyle? style,
+  ) async {
+    final row = _store._rows[rowId];
+    if (row == null) return;
+    _store._rows[rowId] = row.withStyle(columnId, style);
+    _store._notify();
+  }
+
+  @override
+  Future<void> setRowHeight(RowId rowId, double? height) async {
+    final row = _store._rows[rowId];
+    if (row == null) return;
+    _store._rows[rowId] = row.copyWith(
+      height: height,
+      clearHeight: height == null,
+    );
+    _store._notify();
+  }
+
+  @override
   Future<void> deleteRow(RowId id) async {
     final row = _store._rows.remove(id);
     if (row == null) return;
     for (final (index, other) in _store._sortedRows(row.sheetId).indexed) {
       _store._rows[other.id] = other.copyWith(position: index);
+    }
+    _store._notify();
+  }
+}
+
+final class _Views implements ViewRepository {
+  _Views(this._store);
+
+  final InMemoryStore _store;
+
+  @override
+  Stream<List<SavedView>> watchViews(SheetId sheetId) =>
+      _store._watch(() => _store._sortedViews(sheetId));
+
+  @override
+  Future<List<SavedView>> getViews(SheetId sheetId) async =>
+      _store._sortedViews(sheetId);
+
+  @override
+  Future<SavedView> createView(
+    SheetId sheetId, {
+    required String name,
+    required ViewSpec spec,
+  }) async {
+    final view = SavedView(
+      id: ViewId(newId()),
+      sheetId: sheetId,
+      name: name,
+      position: _store._sortedViews(sheetId).length,
+      spec: spec,
+    );
+    _store._views[view.id] = view;
+    _store._notify();
+    return view;
+  }
+
+  @override
+  Future<void> deleteView(ViewId id) async {
+    final view = _store._views.remove(id);
+    if (view == null) return;
+    for (final (index, other) in _store._sortedViews(view.sheetId).indexed) {
+      _store._views[other.id] = SavedView(
+        id: other.id,
+        sheetId: other.sheetId,
+        name: other.name,
+        position: index,
+        spec: other.spec,
+      );
     }
     _store._notify();
   }

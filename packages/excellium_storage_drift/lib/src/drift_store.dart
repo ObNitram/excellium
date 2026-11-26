@@ -12,6 +12,7 @@ final class DriftStore implements ExcelliumStore {
     sheets = _Sheets(_db);
     columns = _Columns(_db);
     rows = _Rows(_db);
+    views = _Views(_db);
   }
 
   final ExcelliumDatabase _db;
@@ -24,6 +25,9 @@ final class DriftStore implements ExcelliumStore {
 
   @override
   late final RowRepository rows;
+
+  @override
+  late final ViewRepository views;
 
   @override
   Future<T> transaction<T>(Future<T> Function() action) =>
@@ -134,6 +138,8 @@ final class _Columns implements ColumnRepository {
                 ? const ReferenceConfig()
                 : decodeReferenceConfig(reference))
           : null,
+      style: decodeCellStyle(record.style),
+      options: decodeOptions(record.options),
     );
   }
 
@@ -199,6 +205,8 @@ final class _Columns implements ColumnRepository {
           type: Value(column.type.name),
           width: Value(column.width),
           reference: Value(_encodeReference(column)),
+          style: Value(encodeCellStyle(column.style)),
+          options: Value(encodeOptions(column.options)),
         ),
       );
 
@@ -240,12 +248,18 @@ final class _Rows implements RowRepository {
 
   final ExcelliumDatabase _db;
 
-  /// Lignes de la feuille avec leurs cellules, une ligne SQL par cellule.
+  /// Lignes de la feuille avec leurs cellules et leurs styles. Une ligne qui
+  /// a plusieurs cellules et plusieurs styles revient en produit cartésien ;
+  /// [_assemble] regroupe par clé, donc les doublons sont sans effet.
   JoinedSelectStatement<HasResultSet, dynamic> _joined(SheetId sheetId) =>
       _db.select(_db.rowRecords).join([
           leftOuterJoin(
             _db.cellRecords,
             _db.cellRecords.rowId.equalsExp(_db.rowRecords.id),
+          ),
+          leftOuterJoin(
+            _db.cellStyleRecords,
+            _db.cellStyleRecords.rowId.equalsExp(_db.rowRecords.id),
           ),
         ])
         ..where(_db.rowRecords.sheetId.equals(sheetId.value))
@@ -255,17 +269,25 @@ final class _Rows implements RowRepository {
     final order = <String>[];
     final records = <String, RowRecord>{};
     final cells = <String, Map<ColumnId, CellValue>>{};
+    final styles = <String, Map<ColumnId, CellStyle>>{};
     for (final result in results) {
       final row = result.readTable(_db.rowRecords);
       if (!records.containsKey(row.id)) {
         order.add(row.id);
         records[row.id] = row;
         cells[row.id] = {};
+        styles[row.id] = {};
       }
       final cell = result.readTableOrNull(_db.cellRecords);
-      if (cell == null) continue;
-      final value = decodeCellValue(cell.value);
-      if (value != null) cells[row.id]![ColumnId(cell.columnId)] = value;
+      if (cell != null) {
+        final value = decodeCellValue(cell.value);
+        if (value != null) cells[row.id]![ColumnId(cell.columnId)] = value;
+      }
+      final styled = result.readTableOrNull(_db.cellStyleRecords);
+      if (styled != null) {
+        final style = decodeCellStyle(styled.style);
+        if (!style.isEmpty) styles[row.id]![ColumnId(styled.columnId)] = style;
+      }
     }
     return [
       for (final id in order)
@@ -273,7 +295,9 @@ final class _Rows implements RowRepository {
           id: RowId(id),
           sheetId: SheetId(records[id]!.sheetId),
           position: records[id]!.position,
+          height: records[id]!.height,
           cells: cells[id]!,
+          styles: styles[id]!,
         ),
     ];
   }
@@ -332,6 +356,37 @@ final class _Rows implements RowRepository {
   }
 
   @override
+  Future<void> setCellStyle(
+    RowId rowId,
+    ColumnId columnId,
+    CellStyle? style,
+  ) async {
+    final encoded = style == null ? null : encodeCellStyle(style);
+    if (encoded == null) {
+      await (_db.delete(_db.cellStyleRecords)..where(
+            (t) =>
+                t.rowId.equals(rowId.value) & t.columnId.equals(columnId.value),
+          ))
+          .go();
+      return;
+    }
+    await _db
+        .into(_db.cellStyleRecords)
+        .insertOnConflictUpdate(
+          CellStyleRecordsCompanion.insert(
+            rowId: rowId.value,
+            columnId: columnId.value,
+            style: encoded,
+          ),
+        );
+  }
+
+  @override
+  Future<void> setRowHeight(RowId rowId, double? height) =>
+      (_db.update(_db.rowRecords)..where((t) => t.id.equals(rowId.value)))
+          .write(RowRecordsCompanion(height: Value(height)));
+
+  @override
   Future<void> deleteRow(RowId id) {
     return _db.transaction(() async {
       final record = await (_db.select(
@@ -350,6 +405,85 @@ final class _Rows implements RowRepository {
         if (other.position == index) continue;
         await (_db.update(_db.rowRecords)..where((t) => t.id.equals(other.id)))
             .write(RowRecordsCompanion(position: Value(index)));
+      }
+    });
+  }
+}
+
+final class _Views implements ViewRepository {
+  _Views(this._db);
+
+  final ExcelliumDatabase _db;
+
+  SimpleSelectStatement<$ViewRecordsTable, ViewRecord> _ordered(
+    SheetId sheetId,
+  ) => _db.select(_db.viewRecords)
+    ..where((t) => t.sheetId.equals(sheetId.value))
+    ..orderBy([(t) => OrderingTerm.asc(t.position)]);
+
+  static SavedView _toView(ViewRecord record) => SavedView(
+    id: ViewId(record.id),
+    sheetId: SheetId(record.sheetId),
+    name: record.name,
+    position: record.position,
+    spec: decodeViewSpec(record.spec),
+  );
+
+  @override
+  Stream<List<SavedView>> watchViews(SheetId sheetId) =>
+      _ordered(sheetId).watch().map((records) => records.map(_toView).toList());
+
+  @override
+  Future<List<SavedView>> getViews(SheetId sheetId) async =>
+      (await _ordered(sheetId).get()).map(_toView).toList();
+
+  @override
+  Future<SavedView> createView(
+    SheetId sheetId, {
+    required String name,
+    required ViewSpec spec,
+  }) {
+    return _db.transaction(() async {
+      final count = await _db.viewRecords
+          .count(where: (t) => t.sheetId.equals(sheetId.value))
+          .getSingle();
+      final view = SavedView(
+        id: ViewId(newId()),
+        sheetId: sheetId,
+        name: name,
+        position: count,
+        spec: spec,
+      );
+      await _db
+          .into(_db.viewRecords)
+          .insert(
+            ViewRecordsCompanion.insert(
+              id: view.id.value,
+              sheetId: sheetId.value,
+              name: name,
+              position: count,
+              spec: encodeViewSpec(spec),
+            ),
+          );
+      return view;
+    });
+  }
+
+  @override
+  Future<void> deleteView(ViewId id) {
+    return _db.transaction(() async {
+      final record = await (_db.select(
+        _db.viewRecords,
+      )..where((t) => t.id.equals(id.value))).getSingleOrNull();
+      if (record == null) return;
+      await (_db.delete(
+        _db.viewRecords,
+      )..where((t) => t.id.equals(id.value))).go();
+      final remaining = await _ordered(SheetId(record.sheetId)).get();
+      for (final (index, other) in remaining.indexed) {
+        if (other.position == index) continue;
+        await (_db.update(_db.viewRecords)..where((t) => t.id.equals(other.id)))
+            .write(ViewRecordsCompanion(position: Value(index)));
       }
     });
   }
