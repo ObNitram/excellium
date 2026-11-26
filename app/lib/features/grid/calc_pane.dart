@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
+import '../../shared/pixel_lines.dart';
 import '../../shared/app_icons.dart';
 import '../formulas/formula_text.dart';
 import 'calc_cell_view.dart';
@@ -35,17 +36,15 @@ class _CalcPaneBarState extends ConsumerState<CalcPaneBar> {
   Widget build(BuildContext context) {
     final pane = ref.watch(calcPaneProvider);
     final notifier = ref.read(calcPaneProvider.notifier);
-    return Container(
+    return LinedBox(
       height: CalcPaneBar.height,
-      decoration: BoxDecoration(
-        color: AppColors.header,
-        border: Border(
-          top: const BorderSide(color: AppColors.fieldBorder),
-          bottom: pane.hidden
-              ? BorderSide.none
-              : const BorderSide(color: AppColors.headerLine),
+      color: AppColors.header,
+      edges: [
+        Edges(
+          top: const Line(AppColors.fieldBorder),
+          bottom: pane.hidden ? null : const Line(AppColors.headerLine),
         ),
-      ),
+      ],
       child: Row(
         children: [
           Semantics(
@@ -198,17 +197,12 @@ class _CalcGridState extends ConsumerState<CalcGrid> {
                     itemExtent: calcRowHeight,
                     itemBuilder: (context, index) => Row(
                       children: [
-                        Container(
+                        LinedBox(
                           width: AppSizes.rowHeaderWidth,
                           height: calcRowHeight,
                           alignment: Alignment.center,
-                          decoration: const BoxDecoration(
-                            color: AppColors.header,
-                            border: Border(
-                              right: BorderSide(color: AppColors.headerLine),
-                              bottom: BorderSide(color: AppColors.headerLine),
-                            ),
-                          ),
+                          color: AppColors.header,
+                          edges: const [headerEdges],
                           child: ExcludeSemantics(
                             child: Text(
                               '${index + 1}',

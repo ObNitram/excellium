@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/theme.dart';
 import '../../shared/app_icons.dart';
 import '../../shared/controls.dart';
+import '../../shared/pixel_lines.dart';
 import '../../shared/confirm.dart';
 import '../../shared/popover.dart';
 import '../../shared/providers.dart';
@@ -303,15 +304,12 @@ class _Corner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: AppSizes.rowHeaderWidth,
-      height: AppSizes.rowHeight,
-      decoration: const BoxDecoration(
-        color: AppColors.header,
-        border: Border(
-          right: BorderSide(color: AppColors.headerLine),
-          bottom: BorderSide(color: AppColors.headerLine),
-        ),
+    return const Lined(
+      color: AppColors.header,
+      edges: [headerEdges],
+      child: SizedBox(
+        width: AppSizes.rowHeaderWidth,
+        height: AppSizes.rowHeight,
       ),
     );
   }
@@ -344,103 +342,105 @@ class _RowNumberState extends ConsumerState<_RowNumber> {
   Widget build(BuildContext context) {
     final active = widget.active;
     final row = widget.row;
-    return Container(
-      width: AppSizes.rowHeaderWidth,
-      height: widget.height,
-      decoration: BoxDecoration(
-        color: active ? AppColors.accentTint : AppColors.header,
-        border: Border(
-          right: BorderSide(
-            width: active ? 2 : 1,
-            color: active ? AppColors.accent : AppColors.headerLine,
-          ),
-          bottom: const BorderSide(color: AppColors.headerLine),
+    return Lined(
+      color: active ? AppColors.accentTint : AppColors.header,
+      edges: [
+        Edges(
+          right: active
+              ? const Line(AppColors.accent, 2)
+              : const Line(AppColors.headerLine),
+          bottom: const Line(AppColors.headerLine),
         ),
-      ),
-      child: Stack(
-        children: [
-          // Un clic sur le numéro ouvre le menu de la ligne.
-          Positioned.fill(
-            child: Popover(
-              width: 220,
-              anchorBuilder: (context, toggle, isOpen) => Tooltip(
-                message: 'Options de la ligne ${row.position + 1}',
-                waitDuration: const Duration(milliseconds: 600),
-                child: InkWell(
-                  onTap: toggle,
-                  child: Center(
-                    child: Text(
-                      '${row.position + 1}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: active || isOpen
-                            ? FontWeight.w600
-                            : FontWeight.w500,
-                        color: active || isOpen
-                            ? AppColors.accent
-                            : AppColors.textMuted,
+      ],
+      child: SizedBox(
+        width: AppSizes.rowHeaderWidth,
+        height: widget.height,
+        child: Stack(
+          children: [
+            // Un clic sur le numéro ouvre le menu de la ligne.
+            Positioned.fill(
+              child: Popover(
+                width: 220,
+                anchorBuilder: (context, toggle, isOpen) => Tooltip(
+                  message: 'Options de la ligne ${row.position + 1}',
+                  waitDuration: const Duration(milliseconds: 600),
+                  child: InkWell(
+                    onTap: toggle,
+                    child: Center(
+                      child: Text(
+                        '${row.position + 1}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: active || isOpen
+                              ? FontWeight.w600
+                              : FontWeight.w500,
+                          color: active || isOpen
+                              ? AppColors.accent
+                              : AppColors.textMuted,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              panelBuilder: (context, close) => PanelItem(
-                icon: AppIcons.delete,
-                label: 'Supprimer la ligne ${row.position + 1}',
-                danger: true,
-                onTap: () {
-                  close();
-                  _delete();
-                },
+                panelBuilder: (context, close) => PanelItem(
+                  icon: AppIcons.delete,
+                  label: 'Supprimer la ligne ${row.position + 1}',
+                  danger: true,
+                  onTap: () {
+                    close();
+                    _delete();
+                  },
+                ),
               ),
             ),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: 6,
-            child: Semantics(
-              container: true,
-              label: 'Régler la hauteur de la ligne ${row.position + 1}',
-              child: ResizeGrip(
-                vertical: false,
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.resizeRow,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onVerticalDragStart: (_) => _dragHeight = widget.height,
-                    onVerticalDragUpdate: (details) {
-                      final start = _dragHeight;
-                      if (start == null) return;
-                      _dragHeight = start + details.delta.dy;
-                      ref
-                          .read(rowResizeProvider.notifier)
-                          .update(
-                            row.id.value,
-                            _dragHeight!
-                                .clamp(SheetRow.minHeight, SheetRow.maxHeight)
-                                .toDouble(),
-                          );
-                    },
-                    onVerticalDragEnd: (_) async {
-                      final height = _dragHeight;
-                      _dragHeight = null;
-                      if (height != null) {
-                        await ref
-                            .read(workbookServiceProvider)
-                            .resizeRow(row, height);
-                      }
-                      ref.read(rowResizeProvider.notifier).end();
-                    },
-                    onDoubleTap: () =>
-                        ref.read(workbookServiceProvider).resizeRow(row, null),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 6,
+              child: Semantics(
+                container: true,
+                label: 'Régler la hauteur de la ligne ${row.position + 1}',
+                child: ResizeGrip(
+                  vertical: false,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.resizeRow,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onVerticalDragStart: (_) => _dragHeight = widget.height,
+                      onVerticalDragUpdate: (details) {
+                        final start = _dragHeight;
+                        if (start == null) return;
+                        _dragHeight = start + details.delta.dy;
+                        ref
+                            .read(rowResizeProvider.notifier)
+                            .update(
+                              row.id.value,
+                              _dragHeight!
+                                  .clamp(SheetRow.minHeight, SheetRow.maxHeight)
+                                  .toDouble(),
+                            );
+                      },
+                      onVerticalDragEnd: (_) async {
+                        final height = _dragHeight;
+                        _dragHeight = null;
+                        if (height != null) {
+                          await ref
+                              .read(workbookServiceProvider)
+                              .resizeRow(row, height);
+                        }
+                        ref.read(rowResizeProvider.notifier).end();
+                      },
+                      onDoubleTap: () => ref
+                          .read(workbookServiceProvider)
+                          .resizeRow(row, null),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

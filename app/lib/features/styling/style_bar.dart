@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
 import '../../shared/app_icons.dart';
+import '../../shared/pixel_lines.dart';
 import '../../shared/controls.dart';
 import '../../shared/popover.dart';
 import '../../shared/providers.dart';
@@ -32,15 +33,13 @@ class StyleBar extends ConsumerWidget {
     final hasTarget =
         column != null && !(selection is CellSelected && cell == null);
 
-    return Container(
+    return LinedBox(
       // 32 px de boutons, 6 px de marge en haut et en bas, 1 px de bordure :
       // la barre a la même hauteur vide ou remplie.
       constraints: const BoxConstraints(minHeight: AppSizes.control + 13),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(bottom: BorderSide(color: AppColors.headerLine)),
-      ),
+      color: AppColors.surface,
+      edges: const [Edges(bottom: Line(AppColors.headerLine))],
       alignment: Alignment.centerLeft,
       child: _Groups([
         const _History(),

@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
 import '../../shared/app_icons.dart';
+import '../../shared/pixel_lines.dart';
 import '../../shared/controls.dart';
 import '../../shared/popover.dart';
 import '../../shared/providers.dart';
@@ -83,13 +84,12 @@ class _ViewBarState extends ConsumerState<ViewBar> {
           ),
     ];
 
-    return Container(
+    return LinedBox(
       constraints: const BoxConstraints(minHeight: 40),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: const BoxDecoration(
-        color: AppColors.header,
-        border: Border(bottom: BorderSide(color: AppColors.headerLine)),
-      ),
+      // 1 point de plus en bas, pour le trait.
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 7),
+      color: AppColors.header,
+      edges: const [Edges(bottom: Line(AppColors.headerLine))],
       // Comme dans la maquette : les menus et les critères à gauche, le
       // nombre de lignes et les actions poussés à droite.
       child: Row(

@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
 import '../../shared/app_icons.dart';
+import '../../shared/pixel_lines.dart';
 import '../../shared/controls.dart';
 import '../../shared/providers.dart';
 import '../../shared/workbook_fields.dart';
@@ -239,15 +240,13 @@ class _EditBarState extends ConsumerState<EditBar> {
       );
     }
 
-    return Container(
+    return LinedBox(
       // + 1 pour la bordure : la barre a la même hauteur vide ou remplie.
       // 32 px de champ, 8 px de marge en haut et en bas, 1 px de bordure.
       constraints: const BoxConstraints(minHeight: AppSizes.barHeight + 1),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(bottom: BorderSide(color: AppColors.headerLine)),
-      ),
+      color: AppColors.surface,
+      edges: const [Edges(bottom: Line(AppColors.headerLine))],
       alignment: Alignment.centerLeft,
       child: content,
     );

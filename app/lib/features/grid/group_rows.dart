@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
 import '../../shared/app_icons.dart';
+import '../../shared/pixel_lines.dart';
 import '../../shared/providers.dart';
 import '../formulas/formula_text.dart';
 import '../views/view_providers.dart';
@@ -75,26 +76,22 @@ class GroupHeader extends ConsumerWidget {
 
     return Padding(
       padding: EdgeInsets.only(top: first ? 0 : gap),
-      child: Container(
+      child: LinedBox(
         height: height,
-        decoration: const BoxDecoration(
-          color: AppColors.header,
-          border: Border(bottom: BorderSide(color: AppColors.headerLine)),
-        ),
+        color: AppColors.header,
         // Le trait du haut est dessiné par-dessus, sans prendre de place.
-        foregroundDecoration: first
-            ? null
-            : const BoxDecoration(
-                border: Border(top: BorderSide(color: AppColors.headerLine)),
-              ),
+        edges: [
+          Edges(
+            top: first ? null : const Line(AppColors.headerLine),
+            bottom: const Line(AppColors.headerLine),
+          ),
+        ],
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
+            LinedBox(
               width: labelWidth,
-              decoration: const BoxDecoration(
-                border: Border(right: BorderSide(color: AppColors.headerLine)),
-              ),
+              edges: const [Edges(right: Line(AppColors.headerLine))],
               child: Semantics(
                 button: true,
                 expanded: !collapsed,
@@ -229,14 +226,12 @@ class GroupAddRow extends ConsumerWidget {
               selection.select(created.id, target.id, edit: true);
             }
           },
-          child: Container(
+          child: const LinedBox(
             height: height,
             alignment: Alignment.centerLeft,
-            padding: const EdgeInsets.only(left: 16),
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: AppColors.gridLine)),
-            ),
-            child: const Row(
+            padding: EdgeInsets.only(left: 16),
+            edges: [Edges(bottom: Line(AppColors.gridLine))],
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 AppIcon(AppIcons.plus, size: 12, color: AppColors.textMuted),

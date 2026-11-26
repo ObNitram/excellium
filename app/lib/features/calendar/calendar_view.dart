@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/theme.dart';
 import '../../shared/app_icons.dart';
 import '../../shared/controls.dart';
+import '../../shared/pixel_lines.dart';
 import '../../shared/popover.dart';
 import '../../shared/drag_data.dart';
 import '../../shared/providers.dart';
@@ -177,34 +178,32 @@ class CalendarView extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 10),
-          Container(
-            decoration: const BoxDecoration(
-              color: AppColors.header,
-              border: Border(
-                top: BorderSide(color: AppColors.headerLine),
-                left: BorderSide(color: AppColors.headerLine),
+          LinedBox(
+            color: AppColors.header,
+            edges: const [
+              Edges(
+                top: Line(AppColors.headerLine),
+                left: Line(AppColors.headerLine),
               ),
-            ),
+            ],
             child: Row(
               children: [
                 for (final (index, day) in _weekdays.indexed)
                   Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        border: Border(
+                    child: LinedBox(
+                      // 1 point de plus en haut et en bas, pour les traits.
+                      padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
+                      edges: [
+                        Edges(
                           // Traits clairs entre les jours, foncé au bord.
-                          right: BorderSide(
-                            color: index == _weekdays.length - 1
+                          right: Line(
+                            index == _weekdays.length - 1
                                 ? AppColors.headerLine
                                 : AppColors.gridLine,
                           ),
-                          bottom: const BorderSide(color: AppColors.headerLine),
+                          bottom: const Line(AppColors.headerLine),
                         ),
-                      ),
+                      ],
                       child: Text(
                         day,
                         style: const TextStyle(
@@ -219,10 +218,8 @@ class CalendarView extends ConsumerWidget {
             ),
           ),
           Expanded(
-            child: Container(
-              decoration: const BoxDecoration(
-                border: Border(left: BorderSide(color: AppColors.headerLine)),
-              ),
+            child: LinedBox(
+              edges: const [Edges(left: Line(AppColors.headerLine))],
               child: Column(
                 children: [
                   for (var week = 0; week < weeks; week++)
@@ -277,23 +274,13 @@ class CalendarView extends ConsumerWidget {
 
     return DragTarget<RowDrag>(
       onAcceptWithDetails: (details) => onDrop(details.data.id, date),
-      builder: (context, candidates, _) => Container(
+      builder: (context, candidates, _) => LinedBox(
         padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: candidates.isNotEmpty
-              ? AppColors.accentTint12
-              : (inMonth ? AppColors.surface : AppColors.header),
-          border: const Border(
-            right: BorderSide(color: AppColors.headerLine),
-            bottom: BorderSide(color: AppColors.headerLine),
-          ),
-        ),
+        color: candidates.isNotEmpty
+            ? AppColors.accentTint12
+            : (inMonth ? AppColors.surface : AppColors.header),
         // Cadre de dépôt par-dessus, sans décaler le contenu.
-        foregroundDecoration: candidates.isNotEmpty
-            ? BoxDecoration(
-                border: Border.all(color: AppColors.accent, width: 2),
-              )
-            : null,
+        edges: [headerEdges, if (candidates.isNotEmpty) selectionFrame],
         child: LayoutBuilder(
           builder: (context, box) {
             // Nombre de lignes qui tiennent sous le numéro du jour : il dépend

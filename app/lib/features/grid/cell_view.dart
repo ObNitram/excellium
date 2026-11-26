@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/theme.dart';
 import '../../shared/app_icons.dart';
 import '../../shared/controls.dart';
+import '../../shared/pixel_lines.dart';
 import '../../shared/providers.dart';
 import '../formulas/formula_text.dart';
 import 'cell_format.dart';
@@ -46,44 +47,37 @@ class CellView extends ConsumerWidget {
         onTap: () => ref
             .read(selectionProvider.notifier)
             .select(row.id, column.id, edit: true),
-        child: Container(
-          width: width,
-          height: height,
-          padding: _padding,
-          clipBehavior: Clip.hardEdge,
-          decoration: BoxDecoration(
-            color: inSelectedColumn
-                ? AppColors.columnTint
-                : (style.fillColor == null
-                      ? AppColors.surface
-                      : Color(style.fillColor!)),
-            border: const Border(
-              right: BorderSide(color: AppColors.gridLine),
-              bottom: BorderSide(color: AppColors.gridLine),
-            ),
+        // Traits nets d'un pixel (voir Lined). Le cadre de la cellule
+        // sélectionnée et les bordures choisies sont dessinés par-dessus,
+        // comme l'ombre intérieure de la maquette : le texte ne bouge pas.
+        child: Lined(
+          color: inSelectedColumn
+              ? AppColors.columnTint
+              : (style.fillColor == null
+                    ? AppColors.surface
+                    : Color(style.fillColor!)),
+          edges: [
+            gridCellEdges,
+            ?switch (style.border) {
+              CellBorder.none => null,
+              CellBorder.bottom => const Edges(bottom: Line(AppColors.text)),
+              CellBorder.box => const Edges.all(Line(AppColors.text)),
+            },
+            if (selected) selectionFrame,
+          ],
+          child: Container(
+            width: width,
+            height: height,
+            padding: _padding,
+            clipBehavior: Clip.hardEdge,
+            decoration: const BoxDecoration(),
+            alignment: switch (style.align) {
+              TextAlignment.left => Alignment.centerLeft,
+              TextAlignment.center => Alignment.center,
+              TextAlignment.right => Alignment.centerRight,
+            },
+            child: _content(ref, style),
           ),
-          // Le cadre de la cellule sélectionnée et les bordures choisies sont
-          // dessinés par-dessus, comme l'ombre intérieure de la maquette : le
-          // texte ne bouge pas.
-          foregroundDecoration: selected
-              ? BoxDecoration(
-                  border: Border.all(color: AppColors.accent, width: 2),
-                )
-              : switch (style.border) {
-                  CellBorder.none => null,
-                  CellBorder.bottom => const BoxDecoration(
-                    border: Border(bottom: BorderSide(color: AppColors.text)),
-                  ),
-                  CellBorder.box => BoxDecoration(
-                    border: Border.all(color: AppColors.text),
-                  ),
-                },
-          alignment: switch (style.align) {
-            TextAlignment.left => Alignment.centerLeft,
-            TextAlignment.center => Alignment.center,
-            TextAlignment.right => Alignment.centerRight,
-          },
-          child: _content(ref, style),
         ),
       ),
     );

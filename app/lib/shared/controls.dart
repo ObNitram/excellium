@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../app/theme.dart';
 import 'app_icons.dart';
+import 'pixel_lines.dart';
 
 /// Bouton carré de 32 px des barres (gras, alignement, effacer…). Allumé, il
 /// prend la teinte d'accent.
@@ -89,11 +90,8 @@ class VSeparator extends StatelessWidget {
   const VSeparator({super.key});
 
   @override
-  Widget build(BuildContext context) => const SizedBox(
-    width: 1,
-    height: 20,
-    child: ColoredBox(color: AppColors.headerLine),
-  );
+  Widget build(BuildContext context) =>
+      const VLine(color: AppColors.headerLine, height: 20);
 }
 
 /// Case à cocher de 15 px, comme celles de la maquette.

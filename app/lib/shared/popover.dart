@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../app/theme.dart';
 import 'app_icons.dart';
+import 'pixel_lines.dart';
 
 /// Un bouton qui ouvre un panneau flottant sous lui.
 ///
@@ -340,8 +341,10 @@ class PanelDivider extends StatelessWidget {
   const PanelDivider({super.key});
 
   @override
-  Widget build(BuildContext context) =>
-      const Divider(height: 1, thickness: 1, color: AppColors.gridLine);
+  Widget build(BuildContext context) => const LinedBox(
+    height: 1,
+    edges: [Edges(bottom: Line(AppColors.gridLine))],
+  );
 }
 
 /// Bouton à bordure de la barre de vue, avec flèche, qui sert d'ancre à un

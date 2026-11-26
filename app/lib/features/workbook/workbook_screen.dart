@@ -6,6 +6,7 @@ import '../../app/theme.dart';
 import 'package:flutter/services.dart';
 
 import '../../shared/app_icons.dart';
+import '../../shared/pixel_lines.dart';
 import '../../shared/controls.dart';
 import '../../shared/workbook_fields.dart';
 import '../../shared/providers.dart';
@@ -172,7 +173,11 @@ class _Zoomed extends StatelessWidget {
             child: Transform.scale(
               scale: zoom,
               alignment: Alignment.topLeft,
-              child: SizedBox(width: width, height: height, child: child),
+              // Les traits restent d'un pixel de l'écran, zoom compris.
+              child: PixelScale(
+                scale: MediaQuery.devicePixelRatioOf(context) * zoom,
+                child: SizedBox(width: width, height: height, child: child),
+              ),
             ),
           ),
         );
@@ -186,13 +191,11 @@ class _TitleBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return LinedBox(
       height: AppSizes.titleBarHeight,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(bottom: BorderSide(color: AppColors.gridLine)),
-      ),
+      color: AppColors.surface,
+      edges: const [Edges(bottom: Line(AppColors.gridLine))],
       child: Row(
         children: [
           Container(

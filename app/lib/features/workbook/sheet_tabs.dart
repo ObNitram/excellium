@@ -7,6 +7,7 @@ import '../../app/theme.dart';
 import '../../shared/app_icons.dart';
 import '../../shared/controls.dart';
 import '../../shared/drag_data.dart';
+import '../../shared/pixel_lines.dart';
 import '../../shared/popover.dart';
 import '../../shared/providers.dart';
 import 'sheet_actions.dart';
@@ -32,14 +33,12 @@ class SheetTabs extends ConsumerWidget {
       service.moveSheet(from, target);
     }
 
-    return Container(
+    return LinedBox(
       height: AppSizes.tabsHeight,
       color: AppColors.header,
       // Le trait du haut est dessiné par-dessus, comme l'ombre intérieure de
       // la maquette : les onglets gardent toute la hauteur.
-      foregroundDecoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: AppColors.headerLine)),
-      ),
+      edges: const [Edges(top: Line(AppColors.headerLine))],
       padding: const EdgeInsets.only(left: 6, right: 12),
       child: Row(
         children: [
@@ -140,26 +139,18 @@ class _SheetTabState extends ConsumerState<_SheetTab> {
 
     // L'onglet actif est blanc, souligné de 2 px et bordé à gauche et à
     // droite ; ces traits sont dessinés par-dessus, sans décaler le texte.
-    return Container(
+    return LinedBox(
       height: AppSizes.tabsHeight,
       color: selected ? AppColors.surface : null,
-      foregroundDecoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            width: 2,
-            color: selected ? AppColors.accent : Colors.transparent,
+      edges: [
+        if (selected)
+          const Edges(
+            left: Line(AppColors.headerLine),
+            right: Line(AppColors.headerLine),
+            bottom: Line(AppColors.accent, 2),
           ),
-          left: BorderSide(
-            width: widget.dropping ? 3 : 1,
-            color: widget.dropping
-                ? AppColors.accent
-                : (selected ? AppColors.headerLine : Colors.transparent),
-          ),
-          right: BorderSide(
-            color: selected ? AppColors.headerLine : Colors.transparent,
-          ),
-        ),
-      ),
+        if (widget.dropping) const Edges(left: Line(AppColors.accent, 3)),
+      ],
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

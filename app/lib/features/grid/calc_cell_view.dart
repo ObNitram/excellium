@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/theme.dart';
+import '../../shared/pixel_lines.dart';
 import '../formulas/formula_text.dart';
 
 /// Une case de calcul : en bas de la grille, ou sur une ligne de
@@ -39,28 +40,22 @@ class CalcCellView extends StatelessWidget {
       selected: selected,
       child: InkWell(
         onTap: onTap,
-        child: Container(
+        child: LinedBox(
           width: width,
           height: height,
           padding: const EdgeInsets.symmetric(horizontal: 7),
           alignment: display.isNumber
               ? Alignment.centerRight
               : Alignment.centerLeft,
-          decoration: BoxDecoration(
-            color: background,
-            border: Border(
-              right: const BorderSide(color: AppColors.gridLine),
-              bottom: bottomLine
-                  ? const BorderSide(color: AppColors.gridLine)
-                  : BorderSide.none,
-            ),
-          ),
+          color: background,
           // Cadre de sélection par-dessus : le contenu ne bouge pas.
-          foregroundDecoration: selected
-              ? BoxDecoration(
-                  border: Border.all(color: AppColors.accent, width: 2),
-                )
-              : null,
+          edges: [
+            Edges(
+              right: const Line(AppColors.gridLine),
+              bottom: bottomLine ? const Line(AppColors.gridLine) : null,
+            ),
+            if (selected) selectionFrame,
+          ],
           child: Text(
             display.text,
             maxLines: 1,
