@@ -1,0 +1,13 @@
+name: excellium_workspace
+description: Espace de travail Excellium (application Flutter et paquets Dart).
+publish_to: none
+
+environment:
+  sdk: ^3.14.0
+
+workspace:
+  - packages/excellium_core
+  - packages/excellium_store_contract
+  - packages/excellium_storage_drift
+  - packages/excellium_formula
+  - app

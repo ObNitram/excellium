@@ -1,0 +1,19 @@
+name: excellium_formula
+description: >-
+  Moteur de formules d'Excellium : il implémente l'interface `FormulaEngine`
+  d'`excellium_core`. C'est le seul paquet qui sait lire et calculer une
+  formule ; on peut le remplacer sans toucher au reste.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.14.0
+
+dependencies:
+  excellium_core:
+    path: ../excellium_core
+
+dev_dependencies:
+  lints: ^6.1.0
+  test: ^1.25.0

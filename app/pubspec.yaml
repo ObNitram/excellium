@@ -1,0 +1,80 @@
+name: excellium_app
+description: Application Flutter d'Excellium (interface et état).
+publish_to: none
+version: 0.1.0+1
+resolution: workspace
+
+environment:
+  sdk: ^3.14.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  drift_flutter: ^0.3.1
+  excellium_core:
+    path: ../packages/excellium_core
+  excellium_formula:
+    path: ../packages/excellium_formula
+  excellium_storage_drift:
+    path: ../packages/excellium_storage_drift
+  flutter_riverpod: ^3.5.0
+  material_ui: ^1.1.0
+  path_provider: ^2.1.6
+  path_drawing: ^1.0.1
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  # Polices embarquées : l'application ne dépend pas des polices installées.
+  # Licences à côté des fichiers, dans assets/fonts/.
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/inter/Inter-Regular.otf
+        - asset: assets/fonts/inter/Inter-Italic.otf
+          style: italic
+        - asset: assets/fonts/inter/Inter-Medium.otf
+          weight: 500
+        - asset: assets/fonts/inter/Inter-MediumItalic.otf
+          weight: 500
+          style: italic
+        - asset: assets/fonts/inter/Inter-SemiBold.otf
+          weight: 600
+        - asset: assets/fonts/inter/Inter-SemiBoldItalic.otf
+          weight: 600
+          style: italic
+        - asset: assets/fonts/inter/Inter-Bold.otf
+          weight: 700
+        - asset: assets/fonts/inter/Inter-BoldItalic.otf
+          weight: 700
+          style: italic
+    # Polices proposées pour le texte des cellules, avec Inter.
+    - family: Liberation Serif
+      fonts:
+        - asset: assets/fonts/liberation-serif/LiberationSerif-Regular.ttf
+        - asset: assets/fonts/liberation-serif/LiberationSerif-Italic.ttf
+          style: italic
+        - asset: assets/fonts/liberation-serif/LiberationSerif-Bold.ttf
+          weight: 600
+        - asset: assets/fonts/liberation-serif/LiberationSerif-BoldItalic.ttf
+          weight: 600
+          style: italic
+    - family: JetBrains Mono
+      fonts:
+        - asset: assets/fonts/jetbrains-mono/JetBrainsMono-Regular.ttf
+        - asset: assets/fonts/jetbrains-mono/JetBrainsMono-Italic.ttf
+          style: italic
+        - asset: assets/fonts/jetbrains-mono/JetBrainsMono-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/jetbrains-mono/JetBrainsMono-SemiBoldItalic.ttf
+          weight: 600
+          style: italic
+        - asset: assets/fonts/jetbrains-mono/JetBrainsMono-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/jetbrains-mono/JetBrainsMono-BoldItalic.ttf
+          weight: 700
+          style: italic
